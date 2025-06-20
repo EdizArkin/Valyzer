@@ -1,0 +1,33 @@
+# Core
+numpy
+pandas
+scikit-learn
+xgboost
+tensorflow
+prophet
+
+# Visualization
+matplotlib
+seaborn
+streamlit
+
+# Web scraping & API
+requests
+beautifulsoup4
+lxml
+
+# Trends & Social Media
+tweepy
+pytrends
+
+# Env management
+python-dotenv
+
+# Time handling
+holidays
+
+# Jupyter (for notebooks folder)
+notebook
+
+# Testing
+pytest
