@@ -192,3 +192,42 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+#--------------------------------------------------------------------------
+
+# Python bytecode ve cache dosyaları
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Jupyter notebook checkpoint'leri
+.ipynb_checkpoints/
+
+# Sanal ortam
+venv/
+env/
+
+# Ortam değişkenleri
+.env
+.env.*
+
+# Veri klasörleri
+data/raw/
+data/processed/
+*.sqlite3
+
+# Eğitilmiş modeller
+*.pkl
+models/
+checkpoints/
+
+# IDE ayarları
+.vscode/
+.idea/
+
+# OS dosyaları
+.DS_Store
+Thumbs.db
+
+# Streamlit cache
+.streamlit/
