@@ -10,6 +10,7 @@ prophet
 matplotlib
 seaborn
 streamlit
+streamlit-autocomplete
 
 # Web scraping & API
 requests

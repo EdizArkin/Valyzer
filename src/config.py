@@ -16,6 +16,7 @@ PROCESSED_DATA_PATH = "data/processed/"
 MODEL_PATH = "models/"
 NOTEBOOK_PATH = "notebooks/"
 LOG_PATH = "logs/"
+SRC_PATH = "src/"  
 
 # --- MODEL PARAMETERS ---
 FORECAST_DAYS = 30
