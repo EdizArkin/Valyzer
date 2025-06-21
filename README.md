@@ -21,17 +21,21 @@ Valyzer is an AI-powered dynamic pricing and demand forecasting platform that he
 
 ```
 valyzer/
-├── data/               # Raw and processed datasets
-├── models/             # Trained ML models
-├── notebooks/          # Jupyter notebooks (EDA, model tests)
-├── src/                # Core modules (pricing, scraping, APIs)
+├── data/                               # Raw and processed datasets
+├── models/                             # Trained ML models
+├── notebooks/                          # Jupyter notebooks (EDA, model tests)
+├── src/                                # Core modules (pricing, scraping, APIs)
 │   ├── daily_essentials/
 │   ├── travel/
 │   ├── external/
 │   └── config.py, utils.py, ...
-├── app/                # Streamlit app
-├── tests/              # Unit tests
-├── .env.example        # Environment variable template
+├── app/                                # Streamlit app
+│   ├── Valyzer.py                      # Main Valyzer page
+│   └── pages/
+│       ├── 1_Daily_Essentials.py       # Daily Essentials page   
+│       └── 2_Travel.py                 # Travel and accomodation page
+├── tests/                              # Unit tests
+├── .env.example                        # Environment variable template
 ├── requirements.txt
 └── README.md
 ```
@@ -83,7 +87,7 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Run the app
-streamlit run app/streamlit_app.py
+streamlit run app/Valyzer.py
 ```
 
 ---
