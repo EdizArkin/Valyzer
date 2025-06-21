@@ -19,6 +19,6 @@ class DataManager:
         self.airports.sort()
         return self.airports
 
-    # İleride:
+    # for future use, if needed:
     # def get_flight_prices(...)
     # def query_database(...)

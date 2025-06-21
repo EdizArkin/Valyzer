@@ -62,6 +62,9 @@ lxml
 tweepy
 pytrends
 python-dotenv
+    .
+    .
+    .
 ```
 
 Install with:

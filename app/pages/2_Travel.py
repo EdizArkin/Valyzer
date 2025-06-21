@@ -8,7 +8,7 @@ import streamlit_toggle as tog
 from src.travel.travel_service import TravelService
 
 
-# Service katmanından havaalanı verisini al
+# Retrieve airport data from service layer
 service = TravelService()
 airports = service.get_airports()
 
@@ -19,9 +19,9 @@ origin = st.selectbox("Origin", options=airports, key="travel_origin")
 destination = st.selectbox("Destination", options=airports, key="travel_destination")
 
 today = date.today()
-is_round_trip = st.toggle(value=False, label="", key="toggle")
+is_round_trip = st.toggle(value=False, label="", key="toggle", help="Toggle to switch between one-way and round-trip travel.")
 
-# Toggle label'ını dinamik göster
+# Show toggle label dynamically
 if is_round_trip:
     st.write("**Round-trip**")
 else:
@@ -34,7 +34,7 @@ if is_round_trip:
         min_value=today,
         key="departure_date"
     )
-    # Dönüş tarihinin en erken seçilebileceği tarih = gidiş tarihinden 1 gün sonrası
+    # Earliest date to choose for return = 1 day after departure date
     min_return_date = travel_date + timedelta(days=1)
     return_date = st.date_input(
         "Return Date",
@@ -51,13 +51,15 @@ else:
     )
     return_date = None
 
-# Ekstra kontrol: dönüş tarihi gidiş tarihinden önce veya aynı gün olmamalı
+# Extra check: return date should not be before or on the same day as departure date
 if return_date is not None and return_date <= travel_date:
     st.error("Return date cannot be earlier than or same as departure date.")
 
 st.markdown("---")
 
+
+# just for demo purposes
 if st.button("Forecast Travel Prices"):
-    # Placeholder tahmin örneği
+    # Placeholder prediction example
     st.info(f"Predicted Airfare: ₺1450\nPredicted Hotel Price: ₺890")
     st.line_chart([1200, 1300, 1375, 1450])
