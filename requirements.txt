@@ -11,6 +11,9 @@ matplotlib
 seaborn
 streamlit
 streamlit-autocomplete
+streamlit-toggle
+streamlit-toggle-switch
+
 
 # Web scraping & API
 requests
