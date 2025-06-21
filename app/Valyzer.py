@@ -17,4 +17,5 @@ st.markdown(
     """
 )
 
-st.image("images/Valyzer_Logo1.3.png", width=5000)
+
+st.image("images/Valyzer_Logo1.3.png", width=600)
