@@ -1,5 +1,9 @@
 import streamlit as st
 
+
+# Set Streamlit page configuration
+st.set_page_config(layout="wide")
+
 st.title("🛍️ Daily Essentials Price Recommendation")
 
 product_name = st.text_input("Enter a product name (e.g., 'milk', 't-shirt')")

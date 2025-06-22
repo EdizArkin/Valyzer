@@ -6,6 +6,10 @@ import streamlit as st
 from datetime import date, timedelta
 import streamlit_toggle as tog
 from src.travel.travel_service import TravelService
+from src.travel.travel_scraper import fetch_travel_data
+
+# Set Streamlit page configuration
+st.set_page_config(layout="wide")
 
 
 # Retrieve airport data from service layer
@@ -73,8 +77,19 @@ if return_date is not None and return_date <= travel_date:
 st.markdown("---")
 
 
+
 # just for demo purposes
 if st.button("Forecast Travel Prices"):
-    # Placeholder prediction example
-    st.info(f"Predicted Airfare: ₺1450\nPredicted Hotel Price: ₺890")
-    st.line_chart([1200, 1300, 1375, 1450])
+    travel_date = travel_date.strftime("%Y-%m-%d")
+    df_prices = fetch_travel_data(origin=origin, destination=destination, travel_date=travel_date)
+    
+    # İki sütuna ayır
+    col1, col2 = st.columns([15, 15], gap="large")
+
+    with col1:
+        st.subheader("📊 Price Table")
+        st.dataframe(df_prices)
+
+    with col2:
+        st.subheader("📈 Price Trend")
+        st.line_chart(df_prices.set_index("date")["price"])
