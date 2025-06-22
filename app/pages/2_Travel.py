@@ -73,16 +73,19 @@ else:
 if return_date is not None and return_date <= travel_date:
     st.error("Return date cannot be earlier than or same as departure date.")
 
-st.markdown("--------------------------------------------------------------------------")
+st.markdown("-----------------------------------------------------------------------------")
 
 
 
-# just for demo purposes
 if st.button("Forecast Travel Prices"):
     travel_date = travel_date.strftime("%Y-%m-%d")
+    #print(travel_date) # Debugging line to check travel_date format
     df_prices = service.get_travel_data(origin=origin, destination=destination, travel_date=travel_date)
+
+    #----------------------------------------------------
+    # For Testing purposes, using hardcoded values
+    #df = service.get_travel_data("Istanbul (IST)", "Berlin (BER)", "2025-07-22")
     
-    # İki sütuna ayır
     col1, col2 = st.columns([15, 15], gap="large")
 
     with col1:

@@ -5,6 +5,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- API KEYS ---
+
+#------ Amadeus API ------
+AMADEUS_API_KEY = os.getenv("AMADEUS_API_KEY")
+AMADEUS_API_SECRET = os.getenv("AMADEUS_API_SECRET")
+
+#------ Other APIs ------
+TRAVELPAYOUTS_API_KEY = os.getenv("TRAVELPAYOUTS_API_KEY") # now out of limits, but kept for reference
 OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
 GOOGLE_TRENDS_REGION = os.getenv("GOOGLE_TRENDS_REGION", "TR")
