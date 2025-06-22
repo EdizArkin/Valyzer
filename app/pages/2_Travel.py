@@ -15,8 +15,23 @@ airports = service.get_airports()
 # Streamlit UI
 st.title("✈️ Travel Price Forecast")
 
-origin = st.selectbox("Origin", options=airports, key="travel_origin")
-destination = st.selectbox("Destination", options=airports, key="travel_destination")
+# make orgigin and destination UN-keysensitive
+origin = st.selectbox(
+    "Origin", 
+    options=airports,
+    key="travel_origin",
+    help="Select your departure airport. The list is not exhaustive, but includes major airports worldwide."
+)
+st.markdown("**Tip:** You can type airport codes in Uppercase (e.g. `SAW`), and we'll match them.")
+
+destination = st.selectbox(
+    "Destination",
+    options=airports,
+    key="travel_destination",
+    help="Select your arrival airport. The list is not exhaustive, but includes major airports worldwide."
+)
+st.markdown("**Tip:** You can type airport codes in Uppercase (e.g. `IST`), and we'll match them.")
+
 
 today = date.today()
 is_round_trip = st.toggle(value=False, label="", key="toggle", help="Toggle to switch between one-way and round-trip travel.")
