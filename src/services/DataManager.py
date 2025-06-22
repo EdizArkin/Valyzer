@@ -1,7 +1,7 @@
 import csv
 
 class DataManager:
-    def __init__(self, data_folder="data"):
+    def __init__(self, data_folder="data/RawDatasets"):
         self.data_folder = data_folder
         self.airports = []
 

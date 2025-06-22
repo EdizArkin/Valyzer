@@ -7,11 +7,8 @@ Data for ±7 days of the selected date (14-day window)
 
 If possible, information such as time, airline, number of stops
 '''
-
-import requests
-
-
 # src/travel/travel_scraper.py
+import requests
 
 from datetime import datetime, timedelta
 import random

@@ -6,7 +6,6 @@ import streamlit as st
 from datetime import date, timedelta
 import streamlit_toggle as tog
 from src.travel.travel_service import TravelService
-from src.travel.travel_scraper import fetch_travel_data
 
 # Set Streamlit page configuration
 st.set_page_config(layout="wide")
@@ -74,14 +73,14 @@ else:
 if return_date is not None and return_date <= travel_date:
     st.error("Return date cannot be earlier than or same as departure date.")
 
-st.markdown("---")
+st.markdown("--------------------------------------------------------------------------")
 
 
 
 # just for demo purposes
 if st.button("Forecast Travel Prices"):
     travel_date = travel_date.strftime("%Y-%m-%d")
-    df_prices = fetch_travel_data(origin=origin, destination=destination, travel_date=travel_date)
+    df_prices = service.get_travel_data(origin=origin, destination=destination, travel_date=travel_date)
     
     # İki sütuna ayır
     col1, col2 = st.columns([15, 15], gap="large")
