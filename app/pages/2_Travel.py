@@ -81,6 +81,7 @@ if st.button("Forecast Travel Prices"):
     travel_date = travel_date.strftime("%Y-%m-%d")
     #print(travel_date) # Debugging line to check travel_date format
     df_prices = service.get_travel_data(origin=origin, destination=destination, travel_date=travel_date)
+    print(df_prices.head())  # Debugging line to check the fetched data
 
     #----------------------------------------------------
     # For Testing purposes, using hardcoded values

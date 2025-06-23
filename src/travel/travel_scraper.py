@@ -10,8 +10,6 @@ class travel_scraper:
         self.api_secret = api_secret
         self.token = self.get_access_token()
 
-
-    # Function to get access token from Amadeus API
     def get_access_token(self):
         url = "https://test.api.amadeus.com/v1/security/oauth2/token"
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -28,12 +26,15 @@ class travel_scraper:
         match = re.search(r'\((\w{3})\)', airport_str)
         return match.group(1) if match else airport_str
 
-
-    # Function to fetch travel data for a given origin, destination, and travel date
-    def fetch_travel_data(self, origin, destination, travel_date, days_window=7):
+    # Using the Amadeus API to fetch travel data information
+    def fetch_travel_data(self, origin, destination, travel_date, days_window=0):
         base_date = datetime.strptime(travel_date, "%Y-%m-%d")
+
+        # Date range for future machine learning model
         date_range = [base_date + timedelta(days=i) for i in range(-days_window, days_window + 1)]
 
+        # Extract IATA codes from the origin and destination strings
+        # Example: "Istanbul Airport (IST)" -> "IST"
         origin_code = self.extract_iata(origin)
         destination_code = self.extract_iata(destination)
 
@@ -42,47 +43,75 @@ class travel_scraper:
         for date in date_range:
             date_str = date.strftime("%Y-%m-%d")
             flights = self.search_flights_amadeus(origin_code, destination_code, date_str)
+
             for offer in flights.get("data", []):
                 price = offer.get("price", {}).get("total")
                 for itinerary in offer.get("itineraries", []):
-                    for segment in itinerary.get("segments", []):
-                        all_flights.append({
-                            "date": date_str,
-                            "price": price,
-                            "origin": segment.get("departure", {}).get("iataCode"),
-                            "destination": segment.get("arrival", {}).get("iataCode"),
-                            "departure_at": segment.get("departure", {}).get("at"),
-                            "arrival_at": segment.get("arrival", {}).get("at"),
-                            "carrier_code": segment.get("carrierCode"),
-                            "flight_number": segment.get("number")
-                        })
+                    segments = itinerary.get("segments", [])
+                    if not segments:
+                        continue
+
+                    # segment[0] is the first flight segment (departure), segment[-1] is the last flight segment (arrival)
+                    if segments[0]["departure"]["iataCode"] != origin_code or \
+                    segments[-1]["arrival"]["iataCode"] != destination_code:
+                        continue
+
+                    route = " → ".join([seg["departure"]["iataCode"] for seg in segments] + [segments[-1]["arrival"]["iataCode"]])
+                    carriers = ", ".join([seg["carrierCode"] for seg in segments])
+                    flight_numbers = ", ".join([seg["carrierCode"] + seg["number"] for seg in segments])
+                    departure_at = segments[0]["departure"]["at"]
+                    arrival_at = segments[-1]["arrival"]["at"]
+
+                    # Duration calculation
+                    departure_time = datetime.fromisoformat(departure_at.replace("Z", "+00:00"))
+                    arrival_time = datetime.fromisoformat(arrival_at.replace("Z", "+00:00"))
+                    duration = arrival_time - departure_time
+                    duration_str = str(duration).split(", ")[-1]
+
+
+                    stops = len(segments) - 1
+                    flight_type = "Direct" if stops == 0 else "Connecting"
+
+                    all_flights.append({
+                        "date": date_str,
+                        "origin": origin_code,
+                        "destination": destination_code,
+                        "price": price,
+                        "flight_type": flight_type,
+                        "route": route,
+                        "duration": duration_str,
+                        "departure_time": departure_time.strftime("%H:%M"),
+                        "arrival_time": arrival_time.strftime("%H:%M"),
+                        #"departure_at": departure_at, # Uncomment if you want to include departureDate + departureTime in the output
+                        #"arrival_at": arrival_at, # Uncomment if you want to include arrivalDate + arrivalTime in the output
+                        "carriers": carriers,
+                        "flight_numbers": flight_numbers,
+                        #"stops": stops # Uncomment if you want to include transfer number in the output
+                    })
 
         df = pd.DataFrame(all_flights)
         return df
 
-    # Function to search flights using Amadeus API
-    # This function handles the API request and token refresh if needed
-    def search_flights_amadeus(self, origin, destination, date):
+
+    def search_flights_amadeus(self, origin_code, destination_code, date):
         url = "https://test.api.amadeus.com/v2/shopping/flight-offers"
         headers = {"Authorization": f"Bearer {self.token}"}
         params = {
-            "originLocationCode": origin,
-            "destinationLocationCode": destination,
+            "originLocationCode": origin_code,
+            "destinationLocationCode": destination_code,
             "departureDate": date,
             "adults": 1,
             "travelClass": "ECONOMY",
             "currencyCode": "TRY",
             "max": 10
         }
+
         response = requests.get(url, headers=headers, params=params)
-        #----------------------------
-        # Debugging output
-        #print(response.status_code)
-        #print(response.text)
 
         if response.status_code == 401:
             self.token = self.get_access_token()
             headers["Authorization"] = f"Bearer {self.token}"
             response = requests.get(url, headers=headers, params=params)
+
         response.raise_for_status()
         return response.json()
