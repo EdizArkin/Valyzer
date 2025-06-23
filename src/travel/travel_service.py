@@ -13,11 +13,11 @@ class TravelService:
         """
         return self.repo.load_airports()
     
-    def get_travel_data(self, origin, destination, travel_date, days_window=7):
+    def get_travel_data(self, origin, destination, travel_date, classInfo, numOfAdults, days_window=7):
         """
         Fetches travel data for the specified origin, destination, and travel date.
         Returns a DataFrame with flight prices and details.
         """
-        return self.scraper.fetch_travel_data(origin, destination, travel_date, days_window)
+        return self.scraper.fetch_travel_data(origin, destination, travel_date, classInfo, numOfAdults, days_window)
 
 # Future work: price prediction, filter etc.

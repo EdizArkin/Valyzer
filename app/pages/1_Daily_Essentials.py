@@ -6,6 +6,13 @@ st.set_page_config(layout="wide")
 
 st.title("🛍️ Daily Essentials Price Recommendation")
 
+
+st.markdown("""----------------------------------------------------------------------------------------------------------""")
+
+st.markdown("""**COMMING SOON: This page is under development. Stay tuned for updates!**""")
+
+st.markdown("""----------------------------------------------------------------------------------------------------------""")
+
 product_name = st.text_input("Enter a product name (e.g., 'milk', 't-shirt')")
 
 if st.button("Predict Price"):

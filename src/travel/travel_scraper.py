@@ -27,7 +27,7 @@ class travel_scraper:
         return match.group(1) if match else airport_str
 
     # Using the Amadeus API to fetch travel data information
-    def fetch_travel_data(self, origin, destination, travel_date, days_window=0):
+    def fetch_travel_data(self, origin, destination, travel_date, classInfo, numOfAdults, days_window=7):
         base_date = datetime.strptime(travel_date, "%Y-%m-%d")
 
         # Date range for future machine learning model
@@ -42,7 +42,7 @@ class travel_scraper:
 
         for date in date_range:
             date_str = date.strftime("%Y-%m-%d")
-            flights = self.search_flights_amadeus(origin_code, destination_code, date_str)
+            flights = self.search_flights_amadeus(origin_code, destination_code, date_str, classInfo, numOfAdults)
 
             for offer in flights.get("data", []):
                 price = offer.get("price", {}).get("total")
@@ -72,11 +72,17 @@ class travel_scraper:
                     stops = len(segments) - 1
                     flight_type = "Direct" if stops == 0 else "Connecting"
 
+                    # Format price string based on number of adults
+                    if numOfAdults > 1:
+                        price_str = f"{price} x {numOfAdults} Adults"
+                    else:
+                        price_str = f"{price} TRY"  # Assuming the price is in TRY, adjust if needed
+
                     all_flights.append({
                         "date": date_str,
                         "origin": origin_code,
                         "destination": destination_code,
-                        "price": price,
+                        "price": price_str,
                         "flight_type": flight_type,
                         "route": route,
                         "duration": duration_str,
@@ -93,15 +99,15 @@ class travel_scraper:
         return df
 
 
-    def search_flights_amadeus(self, origin_code, destination_code, date):
+    def search_flights_amadeus(self, origin_code, destination_code, date, classInfo = "ECONOMY", numOfAdults = 1): # default classInfo is "ECONOMY" and numOfAdults is 1
         url = "https://test.api.amadeus.com/v2/shopping/flight-offers"
         headers = {"Authorization": f"Bearer {self.token}"}
         params = {
             "originLocationCode": origin_code,
             "destinationLocationCode": destination_code,
             "departureDate": date,
-            "adults": 1,
-            "travelClass": "ECONOMY",
+            "adults": numOfAdults,
+            "travelClass": classInfo,
             "currencyCode": "TRY",
             "max": 10
         }
