@@ -3,9 +3,11 @@ import os
 # Add project root to sys.path (Valyzer folder)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 import streamlit as st
+import pandas as pd
 from datetime import date, timedelta
 import streamlit_toggle as tog
 from src.travel.travel_service import TravelService
+
 
 # Set Streamlit page configuration
 st.set_page_config(layout="wide")
@@ -22,21 +24,41 @@ st.title("✈️ Travel Price Forecast")
 col_left, col_right = st.columns([1, 1])
 
 with col_left:
+    placeholder_text = "Please select an airport"
+    airport_options = [placeholder_text] + airports
+
+    # Origin selectbox
     origin = st.selectbox(
-        "Origin", 
-        options=airports,
+        "Origin",
+        options=airport_options,
+        index=0,
         key="travel_origin",
         help="Select your departure airport. The list is not exhaustive, but includes major airports worldwide.\n\n**Tip:** You can type airport codes in Uppercase (e.g. `SAW`), and we'll match them."
     )
-    st.markdown("**Tip:** You can type airport codes in Uppercase (e.g. `SAW`), and we'll match them.")
 
-    destination = st.selectbox(
-        "Destination",
-        options=airports,
-        key="travel_destination",
-        help="Select your arrival airport. The list is not exhaustive, but includes major airports worldwide.\n\n**Tip:** You can type airport codes in Uppercase (e.g. `IST`), and we'll match them."
-    )
-    st.markdown("**Tip:** You can type airport codes in Uppercase (e.g. `IST`), and we'll match them.")
+    # Check if origin is selected with session_state
+    if "origin_selected" not in st.session_state:
+        st.session_state.origin_selected = False
+
+    if origin != placeholder_text:
+        st.session_state.origin_selected = True
+    else:
+        st.session_state.origin_selected = False
+
+    # Destination selectbox only show if origin is selected
+    if st.session_state.origin_selected:
+        destination_options = [placeholder_text] + [a for a in airports if a != origin]
+        destination = st.selectbox(
+            "Destination",
+            options=destination_options,
+            index=0,
+            key="travel_destination",
+            help="Select your arrival airport. The list is not exhaustive, but includes major airports worldwide.\n\n**Tip:** You can type airport codes in Uppercase (e.g. `IST`), and we'll match them."
+        )
+    else:
+        st.info("Please select an origin airport before choosing a destination.")
+
+
 
     # Mapping the values ​​to be sent to the API with the external display
     travel_class_map = {
@@ -46,7 +68,7 @@ with col_left:
         "First": "FIRST"
     }
 
-    col_class, col_num_adults = st.columns([1, 1])
+    col_class, col_num_adults_currencies = st.columns([1, 1])
     # Radio buttons in small font, horizontal display
     with col_class:
         selected_class_display = st.radio(
@@ -62,16 +84,27 @@ with col_left:
     #st.write(f"Selected API travel class value: `{travel_class_api_value}`")
 
 
-    with col_num_adults:
-        num_adults = st.number_input(
-            "Number of Adults",
-            min_value=1,
-            max_value=10, # Adjusted max_value to 10 for practical purposes
-            value=1,
-            step=1,
-            key="num_adults",
-            help="Enter the number of adults traveling. The maximum allowed is 10."
-        )
+    with col_num_adults_currencies:
+
+        col_num_adults, col_num_currencies = st.columns([1, 1])
+        with col_num_adults:
+            num_adults = st.number_input(
+                "Number of Adults",
+                min_value=1,
+                max_value=10, # Adjusted max_value to 10 for practical purposes
+                value=1,
+                step=1,
+                key="num_adults",
+                help="Enter the number of adults traveling. The maximum allowed is 10."
+            )
+        with col_num_currencies:
+            selected_currency = st.selectbox(
+                "Currency",
+                options=["EUR", "USD", "TRY"],
+                index=0,  # Default to EUR
+                key="currency",
+                help="Select the currency for the prices. The default is Euro (EUR)."
+            )
 
 
 
@@ -108,7 +141,7 @@ with col_right:
         )
         return_date = None
 
-# Ekstra kontrol
+# Extra validation for travel dates
 if return_date is not None and return_date <= travel_date:
     st.error("Return date cannot be earlier than or same as departure date.")
 
@@ -117,25 +150,49 @@ st.markdown("-------------------------------------------------------------------
 
 
 if st.button("Forecast Travel Prices"):
-    with st.spinner("Loading travel prices... Please wait"):
-        travel_date = travel_date.strftime("%Y-%m-%d")
-        # Convert the selected class to the API value
-        travel_class_api_value = travel_class_map[selected_class_display]
+    # If origin or destination is not selected, show a warning and set df_prices to an empty DataFrame
+    if origin == placeholder_text or destination == placeholder_text:
+        st.warning("⚠️ Please select both origin and destination airports before proceeding.")
+        df_prices = pd.DataFrame()
+    else:
+        with st.spinner("Loading travel prices... Please wait"):
+            travel_date = travel_date.strftime("%Y-%m-%d")
+            travel_class_api_value = travel_class_map[selected_class_display]
 
-        df_prices = service.get_travel_data(origin=origin, destination=destination, travel_date=travel_date, classInfo=travel_class_api_value, numOfAdults=num_adults)
-        print(df_prices.head())  # Debugging line to check the fetched data
+            try:
+                df_prices = service.get_travel_data(
+                    origin=origin,
+                    destination=destination,
+                    travel_date=travel_date,
+                    classInfo=travel_class_api_value,
+                    numOfAdults=num_adults,
+                    selected_currency=selected_currency
+                )
+            except Exception as e:
+                st.error(f"⚠️ Error fetching flight data: {e}")
+                df_prices = pd.DataFrame()
 
-    #----------------------------------------------------
-    # For Testing purposes, using hardcoded values
-    #df = service.get_travel_data("Istanbul (IST)", "Berlin (BER)", "2025-07-22")
-    
-    col1, col2 = st.columns([15, 15], gap="large")
+        # If an error is returned from the API or if it's empty, show a warning
+        if isinstance(df_prices, dict) and "error" in df_prices:
+            st.warning("⚠️ The server encountered an internal error. Please try again later.")
+            df_prices = pd.DataFrame()
+        elif isinstance(df_prices, pd.DataFrame) and df_prices.empty:
+            st.warning("✈️ No flights found for the selected route and date.")
 
-    with col1:
-        st.subheader("📊 Price Table")
-        st.dataframe(df_prices)
+    # If df_prices is not empty, show table and graph
+    if isinstance(df_prices, pd.DataFrame) and not df_prices.empty:
+        col1, col2 = st.columns([15, 15], gap="large")
 
-    with col2:
-        st.subheader("📈 Price Trend")
-        st.line_chart(df_prices.set_index("date")["price"])
-        st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
+        with col1:
+            st.subheader("📊 Price Table")
+            st.dataframe(df_prices)
+            print(df_prices.head())  # Debugging: Print the first few rows of the DataFrame to console
+
+        with col2:
+            st.subheader("📈 Price Trend")
+            st.line_chart(df_prices.set_index("date")["price"])
+            st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
+            st.markdown(
+                "**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>",
+                unsafe_allow_html=True
+            )

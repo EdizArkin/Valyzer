@@ -1,6 +1,6 @@
 import requests
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import pandas as pd
 from src.config import AMADEUS_API_KEY, AMADEUS_API_SECRET
 
@@ -27,11 +27,21 @@ class travel_scraper:
         return match.group(1) if match else airport_str
 
     # Using the Amadeus API to fetch travel data information
-    def fetch_travel_data(self, origin, destination, travel_date, classInfo, numOfAdults, days_window=7):
+    def fetch_travel_data(self, origin, destination, travel_date, classInfo, numOfAdults, selected_currency, days_window=7):
         base_date = datetime.strptime(travel_date, "%Y-%m-%d")
 
         # Date range for future machine learning model
-        date_range = [base_date + timedelta(days=i) for i in range(-days_window, days_window + 1)]
+        today = datetime.today()
+
+        delta_days = (base_date - today).days
+
+        if delta_days < 7:
+            # if the base_date is 7 days from today, give 14 days interval in the future
+            date_range = [base_date + timedelta(days=i) for i in range(0, 2 * days_window + 1)]
+        else:
+            # else the base_date 7 days or more ahead, give 7 days front-to-back symmetric interval
+            date_range = [base_date + timedelta(days=i) for i in range(-days_window, days_window + 1)]
+
 
         # Extract IATA codes from the origin and destination strings
         # Example: "Istanbul Airport (IST)" -> "IST"
@@ -42,7 +52,20 @@ class travel_scraper:
 
         for date in date_range:
             date_str = date.strftime("%Y-%m-%d")
-            flights = self.search_flights_amadeus(origin_code, destination_code, date_str, classInfo, numOfAdults)
+            
+            try:
+                flights = self.search_flights_amadeus(origin_code, destination_code, date_str, classInfo, numOfAdults)
+
+                # If there is an error, return to the upper layer
+                if isinstance(flights, dict) and "error" in flights:
+                    return {"error": flights["error"], "status_code": flights["status_code"]}
+                
+            except requests.exceptions.HTTPError as http_err:
+                print(f"HTTP error: {http_err}")
+                continue  # Skip this day and continue
+            except Exception as e:
+                print(f"Unexpected error: {e}")
+                continue
 
             for offer in flights.get("data", []):
                 price = offer.get("price", {}).get("total")
@@ -68,15 +91,30 @@ class travel_scraper:
                     duration = arrival_time - departure_time
                     duration_str = str(duration).split(", ")[-1]
 
-
                     stops = len(segments) - 1
                     flight_type = "Direct" if stops == 0 else "Connecting"
 
-                    # Format price string based on number of adults
-                    if numOfAdults > 1:
-                        price_str = f"{price} x {numOfAdults} Adults"
-                    else:
-                        price_str = f"{price} TRY"  # Assuming the price is in TRY, adjust if needed
+    
+                    try:
+                        # Convert price if currency is different
+                        if selected_currency != "EUR":
+                            converted_price = convert_currency(float(price), 'EUR', selected_currency)
+                            formatted_price = f"{converted_price:.2f} {selected_currency}"
+                        else:
+                            formatted_price = f"{float(price):.2f} EUR"
+
+                        # Append adult info
+                        if numOfAdults > 1:
+                            price_str = f"{formatted_price} - for [{numOfAdults} Adults]"
+                        else:
+                            price_str = formatted_price
+
+                    except Exception as e:
+                        print(f"Error converting currency: {e}")
+                        price_str = f"{price} EUR (conversion failed)"
+
+                    
+                
 
                     all_flights.append({
                         "date": date_str,
@@ -108,16 +146,55 @@ class travel_scraper:
             "departureDate": date,
             "adults": numOfAdults,
             "travelClass": classInfo,
-            "currencyCode": "TRY",
+            "currencyCode": "EUR",
             "max": 10
         }
 
-        response = requests.get(url, headers=headers, params=params)
-
-        if response.status_code == 401:
-            self.token = self.get_access_token()
-            headers["Authorization"] = f"Bearer {self.token}"
+        try:
             response = requests.get(url, headers=headers, params=params)
 
-        response.raise_for_status()
-        return response.json()
+            # If token expired we get 401 error → get token again
+            if response.status_code == 401:
+                self.token = self.get_access_token()
+                headers["Authorization"] = f"Bearer {self.token}"
+                response = requests.get(url, headers=headers, params=params)
+
+            # If API still doesn't return success, raise our own HTTPError
+            if response.status_code != 200:
+                raise requests.exceptions.HTTPError(
+                    f"API Error {response.status_code}: {response.text}",
+                    response=response
+                )
+            return response.json()
+
+        except requests.exceptions.HTTPError as http_err:
+            print(f"HTTP error: {http_err}")
+            return {"error": str(http_err), "status_code": response.status_code if response else 500}
+
+        except Exception as err:
+            print(f"Unexpected error: {err}")
+            return {"error": str(err), "status_code": 500}
+
+
+# For Currency Conversion 
+#-------------------------------------------------------------------
+def get_latest_rates(base_currency="EUR"):
+    url = f"https://api.frankfurter.app/latest?from={base_currency}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        rates = data.get("rates", {})
+        rates[base_currency] = 1.0 
+        return rates
+    else:
+        print(f"API error: {response.status_code}")
+        return None
+
+def convert_currency(amount, from_currency, to_currency):
+    rates = get_latest_rates(base_currency=from_currency)
+    if rates is None:
+        raise Exception("Failed to get exchange rates")
+    if to_currency not in rates:
+        raise Exception(f"Currency {to_currency} not found in rates")
+    return amount * rates[to_currency]
+
