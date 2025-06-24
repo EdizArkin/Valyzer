@@ -247,15 +247,16 @@ def render_weather_card(weather, city, is_placeholder=False):
             f"""
             <div style='
                 border: 1px solid #ccc;
-                padding: 10px;
-                border-radius: 10px;
+                padding: 6px;
+                border-radius: 8px;
                 background-color: #f0f0f0;
-                margin-bottom: 10px;
+                margin-bottom: 8px;
                 text-align: center;
                 opacity: 0.4;
+                font-size: 12px;
             '>
-                <h4 style='margin-bottom: 5px'>{city}</h4>
-                <p style='margin: 0; font-size: 16px; color: grey;'>Not selected</p>
+                <h5 style='margin-bottom: 4px'>{city}</h5>
+                <p style='margin: 0; color: grey;'>Not selected</p>
             </div>
             """,
             unsafe_allow_html=True
@@ -265,22 +266,27 @@ def render_weather_card(weather, city, is_placeholder=False):
             f"""
             <div style='
                 border: 1px solid #ccc;
-                padding: 10px;
-                border-radius: 10px;
-                background-color: #f9f9f9;
+                padding: 8px;
+                border-radius: 8px;
+                background-color: #f0f8ff;
                 margin-bottom: 10px;
                 text-align: center;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                font-size: 12px;
             '>
-                <h4 style='margin-bottom: 5px'>{weather["city"]}</h4>
-                <img src='{weather["icon"]}' width='50'>
-                <p style='margin: 0; font-size: 20px;'>{weather["temp"]}°C</p>
-                <p style='font-size: 14px; color: grey'>{weather["desc"]}</p>
+                <h5 style='margin-bottom: 6px;'>{weather["city"]}</h5>
+                <img src='{weather["icon"]}' width='40' style='margin-bottom: 4px;'>
+                <p style='margin: 2px 0; font-size: 18px; font-weight: bold;'>{weather["temp"]}°C</p>
+                <p style='margin: 2px 0; color: #666;'>{weather["desc"]}</p>
+                <p style='margin: 1px 0;'>Feels like: {weather["feels_like"]}°C</p>
+                <p style='margin: 1px 0;'>Max: {weather["max_temp"]}°C / Min: {weather["min_temp"]}°C</p>
             </div>
             """,
             unsafe_allow_html=True
         )
     else:
         st.warning("Weather data could not be loaded.")
+
 
 
 with st.sidebar:
