@@ -208,3 +208,98 @@ if st.button("Forecast Travel Prices"):
                 "**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>",
                 unsafe_allow_html=True
             )
+
+# Weather information section
+
+
+def extract_city_name(city_str):
+    """
+    Extracts city name from strings like 'Baruun Urt Airport (UUN)' or 'London, United Kingdom'.
+    Removes airport codes and trims whitespace or generic suffixes like 'Airport'.
+    """
+    # 1. Remove text in parentheses (e.g., "(UUN)")
+    if "(" in city_str:
+        city_str = city_str.split("(")[0].strip()
+        #print(f"Debug: After removing parentheses, city_str = '{city_str}'")  # Debugging
+
+    # 2. Remove "Airport" suffix if present
+    if "Airport" in city_str:
+        city_str = city_str.replace("Airport", "").strip()
+        #print(f"Debug: After removing 'Airport', city_str = '{city_str}'")  # Debugging
+
+    # 3. Remove any trailing text after a hyphen (e.g., "Baruun Urt - Airport")
+    if "-" in city_str:
+        city_str = city_str.split("-")[0].strip()
+        #print(f"Debug: After splitting by hyphen, city_str = '{city_str}'")  # Debugging
+
+
+    # 4. If still has comma (like 'London, United Kingdom'), take the first part
+    if "," in city_str:
+        city_str = city_str.split(",")[0].strip()
+        #print(f"Debug: After splitting by comma, city_str = '{city_str}'")  # Debugging
+
+    return city_str
+
+
+def render_weather_card(weather, city, is_placeholder=False):
+    if is_placeholder:
+        st.markdown(
+            f"""
+            <div style='
+                border: 1px solid #ccc;
+                padding: 10px;
+                border-radius: 10px;
+                background-color: #f0f0f0;
+                margin-bottom: 10px;
+                text-align: center;
+                opacity: 0.4;
+            '>
+                <h4 style='margin-bottom: 5px'>{city}</h4>
+                <p style='margin: 0; font-size: 16px; color: grey;'>Not selected</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    elif weather:
+        st.markdown(
+            f"""
+            <div style='
+                border: 1px solid #ccc;
+                padding: 10px;
+                border-radius: 10px;
+                background-color: #f9f9f9;
+                margin-bottom: 10px;
+                text-align: center;
+            '>
+                <h4 style='margin-bottom: 5px'>{weather["city"]}</h4>
+                <img src='{weather["icon"]}' width='50'>
+                <p style='margin: 0; font-size: 20px;'>{weather["temp"]}°C</p>
+                <p style='font-size: 14px; color: grey'>{weather["desc"]}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.warning("Weather data could not be loaded.")
+
+
+with st.sidebar:
+    st.subheader("🌤 Weather Info")
+
+    # Origin hava durumu
+    if "travel_origin" not in st.session_state or st.session_state.travel_origin == placeholder_text:
+        render_weather_card(None, "Origin", is_placeholder=True)
+    else:
+        origin = st.session_state.travel_origin
+        origin_weather = service.get_weather(extract_city_name(origin))
+        render_weather_card(origin_weather, extract_city_name(origin))
+
+    # Destination hava durumu
+    if "travel_destination" not in st.session_state or st.session_state.travel_destination == placeholder_text:
+        render_weather_card(None, "Destination", is_placeholder=True)
+    else:
+        destination = st.session_state.travel_destination
+        destination_weather = service.get_weather(extract_city_name(destination))
+        render_weather_card(destination_weather, extract_city_name(destination))
+
+

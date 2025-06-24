@@ -1,12 +1,14 @@
 from unittest import result
 from src.services.DataManager import DataManager
 from src.travel.travel_scraper import travel_scraper
+from src.travel.weather_api import WeatherAPI
 
 
 class TravelService:
     def __init__(self):
         self.repo = DataManager()
         self.scraper = travel_scraper()
+        self.weather_api = WeatherAPI()
 
     def get_airports(self):
         """
@@ -24,6 +26,19 @@ class TravelService:
         # If an error is returned, return it directly to 2_Travel.py
         if isinstance(result, dict) and "error" in result:
             return result
+
+        return result
+    
+    def get_weather(self, city_name):
+        """
+        Fetches weather data for the specified city.
+        Returns a dictionary with weather details.
+        """
+        result = self.weather_api.get_weather(city_name)
+
+        # If an error is returned, return it directly to 2_Travel.py
+        if result is None:
+            return {"error": "Weather data not available", "status_code": 404}
 
         return result
 

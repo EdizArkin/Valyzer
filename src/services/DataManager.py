@@ -10,14 +10,20 @@ class DataManager:
         with open(path, encoding='utf-8') as f:
             reader = csv.reader(f)
             for row in reader:
-                name = row[1]
-                city = row[2]
-                iata = row[4]
+                name = row[1].strip()
+                city = row[2].strip()
+                iata = row[4].strip()
+
                 if iata and len(iata) == 3:
-                    display_name = f"{city} - {name} ({iata})"
+                    if city:
+                        display_name = f"{city} - {name} ({iata})"
+                    else:
+                        display_name = f"{name} ({iata})"
                     self.airports.append(display_name)
+
         self.airports.sort()
         return self.airports
+
 
     # for future use, if needed:
     # def get_flight_prices(...)
