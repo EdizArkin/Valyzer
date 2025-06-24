@@ -172,12 +172,24 @@ if st.button("Forecast Travel Prices"):
                 st.error(f"⚠️ Error fetching flight data: {e}")
                 df_prices = pd.DataFrame()
 
+
         # If an error is returned from the API or if it's empty, show a warning
         if isinstance(df_prices, dict) and "error" in df_prices:
-            st.warning("⚠️ The server encountered an internal error. Please try again later.")
-            df_prices = pd.DataFrame()
+            status = df_prices.get("status_code", 500)
+
+            if status == 500:
+                st.warning("⚠️ Internal Server Error. Please try again later.")
+            elif status == 401:
+                st.warning("🔒 Authorization failed. Please check your credentials.")
+            elif status == 400:
+                st.warning("✈️ No flights found for the selected route and date.")
+            else:
+                st.warning(f"⚠️ An unexpected error occurred (code: {status}).")
+            df_prices = pd.DataFrame()  # To avoid UI crash with empty dataframe afterwards
+
         elif isinstance(df_prices, pd.DataFrame) and df_prices.empty:
             st.warning("✈️ No flights found for the selected route and date.")
+
 
     # If df_prices is not empty, show table and graph
     if isinstance(df_prices, pd.DataFrame) and not df_prices.empty:

@@ -35,11 +35,11 @@ class travel_scraper:
 
         delta_days = (base_date - today).days
 
+        # if the base_date is 7 days from today, give 14 days interval in the future
         if delta_days < 7:
-            # if the base_date is 7 days from today, give 14 days interval in the future
             date_range = [base_date + timedelta(days=i) for i in range(0, 2 * days_window + 1)]
+        # if the base_date is 7 days from today, give 14 days interval in the future
         else:
-            # else the base_date 7 days or more ahead, give 7 days front-to-back symmetric interval
             date_range = [base_date + timedelta(days=i) for i in range(-days_window, days_window + 1)]
 
 
@@ -52,20 +52,10 @@ class travel_scraper:
 
         for date in date_range:
             date_str = date.strftime("%Y-%m-%d")
-            
-            try:
-                flights = self.search_flights_amadeus(origin_code, destination_code, date_str, classInfo, numOfAdults)
+            flights = self.search_flights_amadeus(origin_code, destination_code, date_str, classInfo, numOfAdults)
 
-                # If there is an error, return to the upper layer
-                if isinstance(flights, dict) and "error" in flights:
-                    return {"error": flights["error"], "status_code": flights["status_code"]}
-                
-            except requests.exceptions.HTTPError as http_err:
-                print(f"HTTP error: {http_err}")
-                continue  # Skip this day and continue
-            except Exception as e:
-                print(f"Unexpected error: {e}")
-                continue
+            if isinstance(flights, dict) and "error" in flights:
+                return {"error": flights["error"], "status_code": flights["status_code"]}
 
             for offer in flights.get("data", []):
                 price = offer.get("price", {}).get("total")
@@ -75,8 +65,7 @@ class travel_scraper:
                         continue
 
                     # segment[0] is the first flight segment (departure), segment[-1] is the last flight segment (arrival)
-                    if segments[0]["departure"]["iataCode"] != origin_code or \
-                    segments[-1]["arrival"]["iataCode"] != destination_code:
+                    if segments[0]["departure"]["iataCode"] != origin_code or segments[-1]["arrival"]["iataCode"] != destination_code:
                         continue
 
                     route = " → ".join([seg["departure"]["iataCode"] for seg in segments] + [segments[-1]["arrival"]["iataCode"]])
@@ -88,13 +77,11 @@ class travel_scraper:
                     # Duration calculation
                     departure_time = datetime.fromisoformat(departure_at.replace("Z", "+00:00"))
                     arrival_time = datetime.fromisoformat(arrival_at.replace("Z", "+00:00"))
-                    duration = arrival_time - departure_time
-                    duration_str = str(duration).split(", ")[-1]
+                    duration_str = str(arrival_time - departure_time).split(", ")[-1]
 
                     stops = len(segments) - 1
                     flight_type = "Direct" if stops == 0 else "Connecting"
 
-    
                     try:
                         # Convert price if currency is different
                         if selected_currency != "EUR":
@@ -108,13 +95,9 @@ class travel_scraper:
                             price_str = f"{formatted_price} - for [{numOfAdults} Adults]"
                         else:
                             price_str = formatted_price
-
                     except Exception as e:
-                        print(f"Error converting currency: {e}")
+                        print(f"Currency conversion error: {e}")
                         price_str = f"{price} EUR (conversion failed)"
-
-                    
-                
 
                     all_flights.append({
                         "date": date_str,
@@ -133,11 +116,11 @@ class travel_scraper:
                         #"stops": stops # Uncomment if you want to include transfer number in the output
                     })
 
-        df = pd.DataFrame(all_flights)
-        return df
+        return pd.DataFrame(all_flights)
 
 
-    def search_flights_amadeus(self, origin_code, destination_code, date, classInfo = "ECONOMY", numOfAdults = 1): # default classInfo is "ECONOMY" and numOfAdults is 1
+
+    def search_flights_amadeus(self, origin_code, destination_code, date, classInfo="ECONOMY", numOfAdults=1):  # default classInfo is "ECONOMY" and numOfAdults is 1
         url = "https://test.api.amadeus.com/v2/shopping/flight-offers"
         headers = {"Authorization": f"Bearer {self.token}"}
         params = {
@@ -153,27 +136,38 @@ class travel_scraper:
         try:
             response = requests.get(url, headers=headers, params=params)
 
-            # If token expired we get 401 error → get token again
+            # If token expired, refresh it and retry once (401 error → get token again)
             if response.status_code == 401:
                 self.token = self.get_access_token()
                 headers["Authorization"] = f"Bearer {self.token}"
                 response = requests.get(url, headers=headers, params=params)
 
-            # If API still doesn't return success, raise our own HTTPError
+            if response.status_code == 400 and "INVALID DATE" in response.text:
+                # Flight not found: invalid date may have been entered
+                return {"data": []}
+
             if response.status_code != 200:
                 raise requests.exceptions.HTTPError(
                     f"API Error {response.status_code}: {response.text}",
                     response=response
                 )
+
             return response.json()
 
         except requests.exceptions.HTTPError as http_err:
             print(f"HTTP error: {http_err}")
-            return {"error": str(http_err), "status_code": response.status_code if response else 500}
+            return {
+                "error": str(http_err),
+                "status_code": response.status_code if response else 500
+            }
 
         except Exception as err:
             print(f"Unexpected error: {err}")
-            return {"error": str(err), "status_code": 500}
+            return {
+                "error": str(err),
+                "status_code": 500
+            }
+
 
 
 # For Currency Conversion 
