@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
 import streamlit_toggle as tog
-from src.travel.travel_service import TravelService
+from src.services.travel_service import TravelService
 
 
 # Set Streamlit page configuration

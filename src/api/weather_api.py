@@ -1,6 +1,5 @@
-import json
 import requests
-from src.config import OPENWEATHERMAP_API_KEY
+from src.config.config import OPENWEATHERMAP_API_KEY
 
 class WeatherAPI:
     def __init__(self, api_key = OPENWEATHERMAP_API_KEY):

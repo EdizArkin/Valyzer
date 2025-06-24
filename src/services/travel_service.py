@@ -1,7 +1,6 @@
-from unittest import result
 from src.services.DataManager import DataManager
-from src.travel.travel_scraper import travel_scraper
-from src.travel.weather_api import WeatherAPI
+from src.api.travel_scraper import travel_scraper
+from src.api.weather_api import WeatherAPI
 
 
 class TravelService:

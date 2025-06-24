@@ -1,7 +1,8 @@
 import csv
+from src.config.config import RAW_DATA_PATH, PROCESSED_DATA_PATH
 
 class DataManager:
-    def __init__(self, data_folder="data/RawDatasets"):
+    def __init__(self, data_folder=RAW_DATA_PATH):
         self.data_folder = data_folder
         self.airports = []
 

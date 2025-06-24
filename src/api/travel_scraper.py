@@ -2,7 +2,7 @@ import requests
 import re
 from datetime import date, datetime, timedelta
 import pandas as pd
-from src.config import AMADEUS_API_KEY, AMADEUS_API_SECRET
+from src.config.config import AMADEUS_API_KEY, AMADEUS_API_SECRET
 
 class travel_scraper:
     def __init__(self, api_key=AMADEUS_API_KEY, api_secret=AMADEUS_API_SECRET):

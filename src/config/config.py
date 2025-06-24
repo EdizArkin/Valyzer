@@ -18,9 +18,10 @@ GOOGLE_TRENDS_REGION = os.getenv("GOOGLE_TRENDS_REGION", "TR")
 CALENDARIFIC_API_KEY = os.getenv("CALENDARIFIC_API_KEY")  # (optional, if using holiday API)
 
 # --- PATHS ---
-RAW_DATA_PATH = "data/raw/"
-PROCESSED_DATA_PATH = "data/processed/"
-MODEL_PATH = "models/"
+RAW_DATA_PATH = "data/RawDatasets/"
+PROCESSED_DATA_PATH = "data/ProcessedDatasets/"
+MODEL_PATH = "models/" # where trained models are saved
+RESULTS_PATH = "results/" # where results are saved
 NOTEBOOK_PATH = "notebooks/"
 LOG_PATH = "logs/"
 SRC_PATH = "src/"  
