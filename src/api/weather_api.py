@@ -1,5 +1,4 @@
 import requests
-import json as jason
 from src.config.config import OPENWEATHERMAP_API_KEY
 
 class WeatherAPI:
@@ -15,7 +14,7 @@ class WeatherAPI:
             data = response.json()
 
             current = data["main"]
-            weather_info = data["weather"][0]  # weather dizisinden ilk eleman
+            weather_info = data["weather"][0]
 
             temp_c = current["temp"] - 273.15
             feels_like_c = current["feels_like"] - 273.15

@@ -147,71 +147,108 @@ if return_date is not None and return_date <= travel_date:
 
 st.markdown("-----------------------------------------------------------------------------")
 
+# Helper to display warnings based on API errors
+def check_and_warn(df, label=""):
+    if isinstance(df, dict) and "error" in df:
+        status = df.get("status_code", 500)
+        if status == 500:
+            st.warning(f"⚠️ {label}Internal Server Error.")
+        elif status == 401:
+            st.warning(f"🔒 {label}Authorization failed.")
+        elif status == 400:
+            st.warning(f"✈️ {label}No flights found.")
+        else:
+            st.warning(f"⚠️ {label}Unexpected error (code: {status}).")
+        return pd.DataFrame()
+    elif isinstance(df, pd.DataFrame) and df.empty:
+        st.warning(f"✈️ {label}No flights found.")
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
 
 
+# Initialize session state for dataframes if not already present
+if "df_departure" not in st.session_state: 
+    st.session_state["df_departure"] = pd.DataFrame(); 
+if "df_return" not in st.session_state: 
+    st.session_state["df_return"] = pd.DataFrame(); 
+
+
+# Button clicked
 if st.button("Forecast Travel Prices"):
-    # If origin or destination is not selected, show a warning and set df_prices to an empty DataFrame
     if origin == placeholder_text or destination == placeholder_text:
         st.warning("⚠️ Please select both origin and destination airports before proceeding.")
-        df_prices = pd.DataFrame()
+        st.session_state["df_departure"] = pd.DataFrame()
+        st.session_state["df_return"] = pd.DataFrame()
     else:
         with st.spinner("Loading travel prices... Please wait"):
-            travel_date = travel_date.strftime("%Y-%m-%d")
             travel_class_api_value = travel_class_map[selected_class_display]
+            travel_date_str = travel_date.strftime("%Y-%m-%d")
+            return_date_str = return_date.strftime("%Y-%m-%d") if is_round_trip else None
 
             try:
-                df_prices = service.get_travel_data(
+                # Departure
+                df_departure = service.get_travel_data(
                     origin=origin,
                     destination=destination,
-                    travel_date=travel_date,
+                    travel_date=travel_date_str,
                     classInfo=travel_class_api_value,
                     numOfAdults=num_adults,
                     selected_currency=selected_currency
                 )
+
+                # Return
+                df_return = None
+                if is_round_trip:
+                    df_return = service.get_travel_data(
+                        origin=destination,
+                        destination=origin,
+                        travel_date=return_date_str,
+                        classInfo=travel_class_api_value,
+                        numOfAdults=num_adults,
+                        selected_currency=selected_currency
+                    )
             except Exception as e:
                 st.error(f"⚠️ Error fetching flight data: {e}")
-                df_prices = pd.DataFrame()
+                df_departure = pd.DataFrame()
+                df_return = pd.DataFrame()
+
+            # Check and store results
+            st.session_state["df_departure"] = check_and_warn(df_departure, "Departure - ")
+            st.session_state["df_return"] = check_and_warn(df_return, "Return - ") if is_round_trip else pd.DataFrame()
+
+            
 
 
-        # If an error is returned from the API or if it's empty, show a warning
-        if isinstance(df_prices, dict) and "error" in df_prices:
-            status = df_prices.get("status_code", 500)
+# DISPLAY RESULTS
+df_departure = st.session_state["df_departure"]
+df_return = st.session_state.get("df_return", pd.DataFrame())
 
-            if status == 500:
-                st.warning("⚠️ Internal Server Error. Please try again later.")
-            elif status == 401:
-                st.warning("🔒 Authorization failed. Please check your credentials.")
-            elif status == 400:
-                st.warning("✈️ No flights found for the selected route and date.")
-            else:
-                st.warning(f"⚠️ An unexpected error occurred (code: {status}).")
-            df_prices = pd.DataFrame()  # To avoid UI crash with empty dataframe afterwards
+if not df_departure.empty:
+    if is_round_trip and not df_return.empty:
+        trip_option = st.radio(
+            "Select flight direction",
+            ["Departure", "Return"],
+            horizontal=True
+        )
+        current_df = df_departure if trip_option == "Departure" else df_return
+    else:
+        current_df = df_departure
 
-        elif isinstance(df_prices, pd.DataFrame) and df_prices.empty:
-            st.warning("✈️ No flights found for the selected route and date.")
+    col1, col2 = st.columns([15, 15], gap="large")
 
+    with col1:
+        st.subheader("📊 Price Table")
+        st.dataframe(current_df)
 
-    # If df_prices is not empty, show table and graph
-    if isinstance(df_prices, pd.DataFrame) and not df_prices.empty:
-        col1, col2 = st.columns([15, 15], gap="large")
-
-        with col1:
-            st.subheader("📊 Price Table")
-            st.dataframe(df_prices)
-            print(df_prices.head())  # Debugging: Print the first few rows of the DataFrame to console
-
-        with col2:
-            st.subheader("📈 Price Trend")
-            st.line_chart(df_prices.set_index("date")["price"])
-            st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
-            st.markdown(
-                "**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>",
-                unsafe_allow_html=True
-            )
-
-# Weather information section
+    with col2:
+        st.subheader("📈 Price Trend")
+        st.line_chart(current_df.set_index("date")["price"])
+        st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
+        st.markdown("**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>", unsafe_allow_html=True)
 
 
+#----------------------------------------------------------------------------------------------------------------------------------------
+# Weather Information Section
+# Streamlit sidebar for weather information
 def extract_city_name(city_str):
     """
     Extracts city name from strings like 'Baruun Urt Airport (UUN)' or 'London, United Kingdom'.
@@ -256,12 +293,12 @@ def render_weather_card(weather, city, is_placeholder=False):
                 font-size: 12px;
             '>
                 <h5 style='margin-bottom: 4px'>{city}</h5>
-                <p style='margin: 0; color: grey;'>Not selected</p>
+                <p style='margin: 0; font-size: 16px; color: grey;'>Not selected</p>
             </div>
             """,
             unsafe_allow_html=True
         )
-    elif weather:
+    elif weather and all(k in weather for k in ["city", "temp", "desc", "feels_like", "max_temp", "min_temp", "icon"]):
         st.markdown(
             f"""
             <div style='
@@ -277,20 +314,21 @@ def render_weather_card(weather, city, is_placeholder=False):
                 <h5 style='margin-bottom: 6px;'>{weather["city"]}</h5>
                 <img src='{weather["icon"]}' width='40' style='margin-bottom: 4px;'>
                 <p style='margin: 2px 0; font-size: 18px; font-weight: bold;'>{weather["temp"]}°C</p>
-                <p style='margin: 2px 0; color: #666;'>{weather["desc"]}</p>
-                <p style='margin: 1px 0;'>Feels like: {weather["feels_like"]}°C</p>
-                <p style='margin: 1px 0;'>Max: {weather["max_temp"]}°C / Min: {weather["min_temp"]}°C</p>
+                <p style='margin: 2px 0; font-size: 14px; color: #666;'>{weather["desc"]}</p>
+                <p style='margin: 1px 0; font-size: 13px; color: #444;'>Feels like: {weather["feels_like"]}°C</p>
+                <p style='margin: 1px 0; font-size: 13px; color: #444;'>Max: {weather["max_temp"]}°C / Min: {weather["min_temp"]}°C</p>
             </div>
             """,
             unsafe_allow_html=True
         )
     else:
-        st.warning("Weather data could not be loaded.")
+        st.warning(f"🌥️ Weather data could not be loaded for **{city}**.")
+
 
 
 
 with st.sidebar:
-    st.subheader("🌤 Weather Info")
+    st.subheader("🌤 Today's Weather Info")
 
     # Origin hava durumu
     if "travel_origin" not in st.session_state or st.session_state.travel_origin == placeholder_text:
