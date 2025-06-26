@@ -165,6 +165,21 @@ def check_and_warn(df, label=""):
     return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
 
 
+# Caching the travel data retrieval function to optimize performance
+# This will cache the results for 45 minutes (2700 seconds)
+@st.cache_data(ttl=2700)
+def get_cached_travel_data(origin, destination, travel_date, classInfo, numOfAdults, selected_currency,):
+    return service.get_travel_data(
+        origin=origin,
+        destination=destination,
+        travel_date=travel_date,
+        classInfo=classInfo,
+        numOfAdults=numOfAdults,
+        selected_currency=selected_currency
+    )
+
+
+
 # Initialize session state for dataframes if not already present
 if "df_departure" not in st.session_state: 
     st.session_state["df_departure"] = pd.DataFrame(); 
@@ -186,7 +201,7 @@ if st.button("Forecast Travel Prices"):
 
             try:
                 # Departure
-                df_departure = service.get_travel_data(
+                df_departure = get_cached_travel_data(
                     origin=origin,
                     destination=destination,
                     travel_date=travel_date_str,
@@ -198,7 +213,7 @@ if st.button("Forecast Travel Prices"):
                 # Return
                 df_return = None
                 if is_round_trip:
-                    df_return = service.get_travel_data(
+                    df_return = get_cached_travel_data(
                         origin=destination,
                         destination=origin,
                         travel_date=return_date_str,
@@ -278,6 +293,14 @@ def extract_city_name(city_str):
     return city_str
 
 
+# Caching for optimized weather data retrieval
+@st.cache_data(ttl=900)  # 15 minute cache
+def get_cached_weather(city_name):
+    return service.get_weather(city_name)
+
+
+
+
 def render_weather_card(weather, city, is_placeholder=False):
     if is_placeholder:
         st.markdown(
@@ -335,7 +358,7 @@ with st.sidebar:
         render_weather_card(None, "Origin", is_placeholder=True)
     else:
         origin = st.session_state.travel_origin
-        origin_weather = service.get_weather(extract_city_name(origin))
+        origin_weather = get_cached_weather(extract_city_name(origin))
         render_weather_card(origin_weather, extract_city_name(origin))
 
     # Destination hava durumu
@@ -343,7 +366,7 @@ with st.sidebar:
         render_weather_card(None, "Destination", is_placeholder=True)
     else:
         destination = st.session_state.travel_destination
-        destination_weather = service.get_weather(extract_city_name(destination))
+        destination_weather = get_cached_weather(extract_city_name(destination))
         render_weather_card(destination_weather, extract_city_name(destination))
 
 
