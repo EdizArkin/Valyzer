@@ -167,7 +167,7 @@ def check_and_warn(df, label=""):
 
 # Caching the travel data retrieval function to optimize performance
 # This will cache the results for 45 minutes (2700 seconds)
-@st.cache_data(ttl=2700)
+@st.cache_data(ttl=2700, show_spinner=False)
 def get_cached_travel_data(origin, destination, travel_date, classInfo, numOfAdults, selected_currency,):
     return service.get_travel_data(
         origin=origin,
@@ -294,7 +294,7 @@ def extract_city_name(city_str):
 
 
 # Caching for optimized weather data retrieval
-@st.cache_data(ttl=900)  # 15 minute cache
+@st.cache_data(ttl=900, show_spinner=False)  # 15 minute cache
 def get_cached_weather(city_name):
     return service.get_weather(city_name)
 
