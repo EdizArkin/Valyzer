@@ -1,5 +1,6 @@
 import sys
 import os
+import random
 # Add project root to sys.path (Valyzer folder)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 import streamlit as st
@@ -178,6 +179,11 @@ def get_cached_travel_data(origin, destination, travel_date, classInfo, numOfAdu
         selected_currency=selected_currency
     )
 
+# Caching the activities retrieval function to optimize performance
+# This will cache the results for 15 minutes (900 seconds)
+@st.cache_data(ttl=900, show_spinner=False)
+def get_cached_activities(city_name):
+    return service.get_destination_activities(city_name)
 
 
 # Initialize session state for dataframes if not already present
@@ -231,66 +237,79 @@ if st.button("Forecast Travel Prices"):
             st.session_state["df_return"] = check_and_warn(df_return, "Return - ") if is_round_trip else pd.DataFrame()
 
             
+            #!!!!!!!!!!!!! When I press return, the page is still refreshed instead of showing it and the return planes are not shown.
+
+            # DISPLAY RESULTS
+            df_departure = st.session_state["df_departure"]
+            df_return = st.session_state.get("df_return", pd.DataFrame())
+
+            if not df_departure.empty:
+                if is_round_trip and not df_return.empty:
+                    trip_option = st.radio(
+                        "Select flight direction",
+                        ["Departure", "Return"],
+                        horizontal=True
+                    )
+                    current_df = df_departure if trip_option == "Departure" else df_return
+                else:
+                    current_df = df_departure
+
+                col1, col2 = st.columns([15, 15], gap="large")
+
+                with col1:
+                    st.subheader("📊 Price Table")
+                    st.dataframe(current_df)
+
+                with col2:
+                    st.subheader("📈 Price Trend")
+                    st.line_chart(current_df.set_index("date")["price"])
+                    st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
+                    st.markdown("**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>", unsafe_allow_html=True)
 
 
-# DISPLAY RESULTS
-df_departure = st.session_state["df_departure"]
-df_return = st.session_state.get("df_return", pd.DataFrame())
+            selected_city = service.extract_city_name(destination)
+            if selected_city:
+                activities = get_cached_activities(selected_city)
 
-if not df_departure.empty:
-    if is_round_trip and not df_return.empty:
-        trip_option = st.radio(
-            "Select flight direction",
-            ["Departure", "Return"],
-            horizontal=True
-        )
-        current_df = df_departure if trip_option == "Departure" else df_return
-    else:
-        current_df = df_departure
+                if not activities or not isinstance(activities, list):
+                    st.info("❗ No activities found for the selected city. Please try another city or check back later.")
+                else:
+                    # Description'ı olmayan aktiviteleri filtrele
+                    activities = [a for a in activities if a.get("description")]
 
-    col1, col2 = st.columns([15, 15], gap="large")
+                    if activities:
+                        st.markdown(f"### 🎯 Things to Do in {selected_city}")
+                        # Rastgele 3 aktivite seç
+                        sample_activities = random.sample(activities, min(3, len(activities)))
 
-    with col1:
-        st.subheader("📊 Price Table")
-        st.dataframe(current_df)
+                        for activity in sample_activities:
 
-    with col2:
-        st.subheader("📈 Price Trend")
-        st.line_chart(current_df.set_index("date")["price"])
-        st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
-        st.markdown("**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>", unsafe_allow_html=True)
+                            if "pictures" in activity and isinstance(activity["pictures"], list) and activity["pictures"]:
+                                image_urls = activity.get("pictures", [])[:5]  # İlk 5 resmi al
+                            
+                            st.markdown(f"""
+                                <div style='
+                                    border: 1px solid #ddd;
+                                    border-radius: 12px;
+                                    padding: 15px;
+                                    margin-bottom: 15px;
+                                    background-color: #fefefe;
+                                    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+                                '>
+                                    <h4 style='margin-bottom: 8px; color: #333;'>{activity.get("name", "Untitled")}</h4>
+                                    <p style='margin: 0; font-size: 15px; color: #555;'>{activity.get("description")}</p>
+                                    <div style='display: flex; gap: 10px; margin-bottom: 15px;'>
+                                    {''.join([f"<img src='{url}' style='width: 200px; height: 200px; object-fit: cover; border-radius: 6px;'/>" for url in image_urls])}
+                                </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.info("❗No activities described for this city were found. Please try another city or check back later.")
+
 
 
 #----------------------------------------------------------------------------------------------------------------------------------------
 # Weather Information Section
 # Streamlit sidebar for weather information
-def extract_city_name(city_str):
-    """
-    Extracts city name from strings like 'Baruun Urt Airport (UUN)' or 'London, United Kingdom'.
-    Removes airport codes and trims whitespace or generic suffixes like 'Airport'.
-    """
-    # 1. Remove text in parentheses (e.g., "(UUN)")
-    if "(" in city_str:
-        city_str = city_str.split("(")[0].strip()
-        #print(f"Debug: After removing parentheses, city_str = '{city_str}'")  # Debugging
-
-    # 2. Remove "Airport" suffix if present
-    if "Airport" in city_str:
-        city_str = city_str.replace("Airport", "").strip()
-        #print(f"Debug: After removing 'Airport', city_str = '{city_str}'")  # Debugging
-
-    # 3. Remove any trailing text after a hyphen (e.g., "Baruun Urt - Airport")
-    if "-" in city_str:
-        city_str = city_str.split("-")[0].strip()
-        #print(f"Debug: After splitting by hyphen, city_str = '{city_str}'")  # Debugging
-
-
-    # 4. If still has comma (like 'London, United Kingdom'), take the first part
-    if "," in city_str:
-        city_str = city_str.split(",")[0].strip()
-        #print(f"Debug: After splitting by comma, city_str = '{city_str}'")  # Debugging
-
-    return city_str
 
 
 # Caching for optimized weather data retrieval
@@ -358,15 +377,15 @@ with st.sidebar:
         render_weather_card(None, "Origin", is_placeholder=True)
     else:
         origin = st.session_state.travel_origin
-        origin_weather = get_cached_weather(extract_city_name(origin))
-        render_weather_card(origin_weather, extract_city_name(origin))
+        origin_weather = get_cached_weather(service.extract_city_name(origin))
+        render_weather_card(origin_weather, service.extract_city_name(origin))
 
     # Destination hava durumu
     if "travel_destination" not in st.session_state or st.session_state.travel_destination == placeholder_text:
         render_weather_card(None, "Destination", is_placeholder=True)
     else:
         destination = st.session_state.travel_destination
-        destination_weather = get_cached_weather(extract_city_name(destination))
-        render_weather_card(destination_weather, extract_city_name(destination))
+        destination_weather = get_cached_weather(service.extract_city_name(destination))
+        render_weather_card(destination_weather, service.extract_city_name(destination))
 
 

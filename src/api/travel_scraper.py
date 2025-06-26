@@ -85,7 +85,7 @@ class travel_scraper:
                     try:
                         # Convert price if currency is different
                         if selected_currency != "EUR":
-                            converted_price = convert_currency(float(price), 'EUR', selected_currency)
+                            converted_price = self.convert_currency(float(price), 'EUR', selected_currency)
                             formatted_price = f"{converted_price:.2f} {selected_currency}"
                         else:
                             formatted_price = f"{float(price):.2f} EUR"
@@ -168,27 +168,80 @@ class travel_scraper:
                 "status_code": 500
             }
 
+    # For Currency Conversion
+    # This function fetches the latest exchange rates from the Frankfurter API
+    #-------------------------------------------------------------------
+    def get_latest_rates(self, base_currency="EUR"):
+        url = f"https://api.frankfurter.app/latest?from={base_currency}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            rates = data.get("rates", {})
+            rates[base_currency] = 1.0 
+            return rates
+        else:
+            print(f"API error: {response.status_code}")
+            return None
+
+    def convert_currency(self, amount, from_currency, to_currency):
+        rates = self.get_latest_rates(base_currency=from_currency)
+        if rates is None:
+            raise Exception("Failed to get exchange rates")
+        if to_currency not in rates:
+            raise Exception(f"Currency {to_currency} not found in rates")
+        return amount * rates[to_currency]
 
 
-# For Currency Conversion 
-#-------------------------------------------------------------------
-def get_latest_rates(base_currency="EUR"):
-    url = f"https://api.frankfurter.app/latest?from={base_currency}"
-    response = requests.get(url)
-    if response.status_code == 200:
+    #-------------------------------------------------------------------
+    # For City Coordinates
+    # Destination Experiences API by Amadeus
+
+    def get_city_coordinates(self, city_name):
+        url = "https://test.api.amadeus.com/v1/reference-data/locations"
+        headers = {"Authorization": f"Bearer {self.token}"}
+        params = {
+            "keyword": city_name,
+            "subType": "CITY"
+        }
+
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+
         data = response.json()
-        rates = data.get("rates", {})
-        rates[base_currency] = 1.0 
-        return rates
-    else:
-        print(f"API error: {response.status_code}")
-        return None
 
-def convert_currency(amount, from_currency, to_currency):
-    rates = get_latest_rates(base_currency=from_currency)
-    if rates is None:
-        raise Exception("Failed to get exchange rates")
-    if to_currency not in rates:
-        raise Exception(f"Currency {to_currency} not found in rates")
-    return amount * rates[to_currency]
+        if not data.get("data"):
+            print(f"[WARN] No data found for city: {city_name}")
+            return None, None
+
+        location = data["data"][0]["geoCode"]
+        lat = location["latitude"]
+        lon = location["longitude"]
+        return lat, lon
+
+
+    #-------------------------------------------------------------------
+    # For Destination Activities
+    def fetch_destination_activities(self, city_name):
+        try:
+            lat, lon = self.get_city_coordinates(city_name)
+
+            if not lat or not lon:
+                print(f"[WARN] Koordinatlar alınamadı: {city_name}")
+                return []
+
+            response = requests.get(
+                "https://test.api.amadeus.com/v1/shopping/activities",
+                headers={"Authorization": f"Bearer {self.token}"},
+                params={"latitude": lat, "longitude": lon, "radius": 20}
+            )
+            response.raise_for_status()
+            return response.json().get("data", [])
+
+        except requests.exceptions.HTTPError as e:
+            print(f"[ERROR] Amadeus API error: {e}")
+            return []
+
+        except Exception as e:
+            print(f"[ERROR] Unknown error: {e}")
+            return []
 
