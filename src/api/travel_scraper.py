@@ -226,7 +226,7 @@ class travel_scraper:
             lat, lon = self.get_city_coordinates(city_name)
 
             if not lat or not lon:
-                print(f"[WARN] Koordinatlar alınamadı: {city_name}")
+                print(f"[WARN] Coordinates could not be obtained: {city_name}")
                 return []
 
             response = requests.get(
@@ -244,4 +244,89 @@ class travel_scraper:
         except Exception as e:
             print(f"[ERROR] Unknown error: {e}")
             return []
+
+
+    #-------------------------------------------------------------------
+    # For Hotels
+    # This function fetches hotels in a city
+
+    def fetch_hotels_by_city(self, destination):
+        """
+        Fetches hotel data for a given destination city using its IATA code.
+        Returns a list of hotel dictionaries with ratings (up to 3 rated hotels).
+        """
+        try:
+            city_iata_code = self.extract_iata(destination)
+            response = requests.get(
+                f"https://test.api.amadeus.com/v1/reference-data/locations/hotels/by-city?cityCode={city_iata_code}",
+                headers={"Authorization": f"Bearer {self.token}"}
+            )
+            response.raise_for_status()
+            hotels = response.json().get("data", [])
+
+            if not hotels:
+                print(f"[WARN] No hotels found for city: {city_iata_code}")
+                return []
+
+            # Get ratings only with first 10 hotel IDs
+            hotel_ids = [hotel.get("hotelId") for hotel in hotels if "hotelId" in hotel][:10]
+            ratings = self.get_hotel_ratings(hotel_ids)
+
+            # Match rating data by ID (if rating exists)
+            rating_map = {r["hotelId"]: r for r in ratings}
+
+            # Add ratings to hotel objects
+            for hotel in hotels:
+                hotel_id = hotel.get("hotelId")
+                if hotel_id in rating_map:
+                    hotel["ratings"] = rating_map[hotel_id]
+                else:
+                    hotel["ratings"] = None  # rating not found
+
+            return hotels
+
+        except requests.exceptions.HTTPError as e:
+            print(f"[ERROR] Amadeus API error: {e}")
+            return []
+
+        except Exception as e:
+            print(f"[ERROR] Unknown error: {e}")
+            return []
+
+
+
+    def get_hotel_ratings(self, hotel_ids):
+        """
+        Fetches hotel ratings for a list of hotel IDs in batches of 3.
+        Returns a list of rating data dictionaries.
+        """
+        all_ratings = []
+        
+        if not hotel_ids:
+            return []
+
+        try:
+            # Batch the hotel IDs to avoid hitting API limits
+            batch_size = 3
+            for i in range(0, len(hotel_ids), batch_size):
+                batch = hotel_ids[i:i+batch_size]
+                hotel_ids_str = ",".join(batch)
+                
+                response = requests.get(
+                    "https://test.api.amadeus.com/v2/e-reputation/hotel-sentiments",
+                    headers={"Authorization": f"Bearer {self.token}"},
+                    params={"hotelIds": hotel_ids_str}
+                )
+                if response.status_code == 200:
+                    ratings = response.json().get("data", [])
+                    all_ratings.extend(ratings)
+                elif response.status_code == 429:
+                    print(f"[WARN] Rate limit exceeded, FREE QUOTA EXCEEDED")
+                else:
+                    print(f"[ERROR] Rating fetch failed for batch {batch}: {response.status_code} {response.reason}")
+        except Exception as e:
+            print(f"[ERROR] Unknown error during rating fetch: {e}")
+
+        return all_ratings
+
 

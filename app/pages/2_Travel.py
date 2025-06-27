@@ -1,6 +1,7 @@
 import sys
 import os
 import random
+import math
 # Add project root to sys.path (Valyzer folder)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 import streamlit as st
@@ -186,6 +187,13 @@ def get_cached_activities(city_name):
     return service.get_destination_activities(city_name)
 
 
+# Caching the hotels retrieval function to optimize performance
+# This will cache the results for 15 minutes (900 seconds)
+@st.cache_data(ttl=900, show_spinner=False)
+def get_cached_hotels(destination):
+    return service.get_hotels_by_city(destination)
+
+
 # Initialize session state for dataframes if not already present
 if "df_departure" not in st.session_state: 
     st.session_state["df_departure"] = pd.DataFrame(); 
@@ -266,44 +274,82 @@ if st.button("Forecast Travel Prices"):
                     st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
                     st.markdown("**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>", unsafe_allow_html=True)
 
-
+            #--------------------------------------------------------------------------------------------------------------------------------------------
+            # Activities and Hotels Section
+            st.markdown("-----------------------------------------------------------------------------")
             selected_city = service.extract_city_name(destination)
             if selected_city:
                 activities = get_cached_activities(selected_city)
+                hotels = get_cached_hotels(destination)
 
-                if not activities or not isinstance(activities, list):
-                    st.info("❗ No activities found for the selected city. Please try another city or check back later.")
-                else:
-                    # Description'ı olmayan aktiviteleri filtrele
-                    activities = [a for a in activities if a.get("description")]
+                col1, col2 = st.columns([1, 1], gap="large")
 
-                    if activities:
-                        st.markdown(f"### 🎯 Things to Do in {selected_city}")
-                        # Rastgele 3 aktivite seç
-                        sample_activities = random.sample(activities, min(3, len(activities)))
+                with col1:
+                    st.markdown(f"### 🎯 Things to Do in {selected_city}")
+                    if not activities or not isinstance(activities, list):
+                        st.info("❗ No activities found for the selected city.")
+                    else:
+                        # Filter activities without description
+                        activities = [a for a in activities if a.get("description")]
+                        if activities:
+                            # Choose 3 random activities
+                            sample_activities = random.sample(activities, min(3, len(activities)))
+                            for activity in sample_activities:
+                                image_urls = activity.get("pictures", [])[:6] if "pictures" in activity else []
+                                st.markdown(f"""
+                                    <div style='
+                                        border: 1px solid #ddd;
+                                        border-radius: 12px;
+                                        padding: 15px;
+                                        margin-bottom: 15px;
+                                        background-color: #fefefe;
+                                        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+                                    '>
+                                        <h4 style='margin-bottom: 8px; color: #333;'>{activity.get("name", "Untitled")}</h4>
+                                        <p style='margin: 0; font-size: 15px; color: #555;'>{activity.get("description")}</p>
+                                        <div style='display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;'>
+                                            {''.join([f"<img src='{url}' style='width: 100px; height: 100px; object-fit: cover; border-radius: 6px;'/>" for url in image_urls])}
+                                        </div>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.info("❗No activities with description found for this city.")
 
-                        for activity in sample_activities:
+                with col2:
+                    st.markdown(f"### 🏨 Top Rated Hotels in {selected_city}")
+                    if not hotels or not isinstance(hotels, list):
+                        st.info("❗ No hotel data found.")
+                    else:
+                        hotels = sorted(hotels, key=lambda h: h.get("overallRating", 0) or 0, reverse=True)[:10]
 
-                            if "pictures" in activity and isinstance(activity["pictures"], list) and activity["pictures"]:
-                                image_urls = activity.get("pictures", [])[:5]  # İlk 5 resmi al
-                            
+                        for hotel in hotels:
+                            rating = hotel.get("overallRating")
+                            if rating is not None:
+                                stars = math.ceil((rating / 100) * 5)
+                                yellow_star = "⭐"
+                                white_star = "☆"
+                                star_display = yellow_star * stars + white_star * (5 - stars)
+                                rating_text = f"{rating}/100"
+                                star_line = f"<p style='font-size: 18px;'>{star_display}</p>"
+                            else:
+                                rating_text = "Rating info not available"
+                                star_line = ""
+
                             st.markdown(f"""
                                 <div style='
                                     border: 1px solid #ddd;
                                     border-radius: 12px;
                                     padding: 15px;
                                     margin-bottom: 15px;
-                                    background-color: #fefefe;
+                                    background-color: #fdfdfd;
                                     box-shadow: 0 2px 6px rgba(0,0,0,0.05);
                                 '>
-                                    <h4 style='margin-bottom: 8px; color: #333;'>{activity.get("name", "Untitled")}</h4>
-                                    <p style='margin: 0; font-size: 15px; color: #555;'>{activity.get("description")}</p>
-                                    <div style='display: flex; gap: 10px; margin-bottom: 15px;'>
-                                    {''.join([f"<img src='{url}' style='width: 200px; height: 200px; object-fit: cover; border-radius: 6px;'/>" for url in image_urls])}
+                                    <h4 style='margin-bottom: 6px; color: #333;'>{hotel.get("name", "Unnamed Hotel")}</h4>
+                                    <p style='margin: 0 0 4px 0; font-size: 15px; color: #555;'>Overall Rating: {rating_text}</p>
+                                    <p style='margin: 0 0 4px 0; font-size: 14px; color: #777;'>Reviews: {hotel.get("numberOfReviews", "N/A")} | Ratings: {hotel.get("numberOfRatings", "N/A")}</p>
+                                    {star_line}
                                 </div>
                             """, unsafe_allow_html=True)
-                    else:
-                        st.info("❗No activities described for this city were found. Please try another city or check back later.")
 
 
 
@@ -320,6 +366,7 @@ def get_cached_weather(city_name):
 
 
 
+# Function to render weather card
 def render_weather_card(weather, city, is_placeholder=False):
     if is_placeholder:
         st.markdown(

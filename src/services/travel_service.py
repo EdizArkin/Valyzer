@@ -56,6 +56,19 @@ class TravelService:
         
         return result
 
+    def get_hotels_by_city(self, destination):
+        """
+        Fetches hotels in the specified city using its IATA code.
+        Returns a DataFrame with hotel details.
+        """
+        result = self.scraper.fetch_hotels_by_city(destination)
+
+        # If an error is returned, return it directly to 2_Travel.py
+        if isinstance(result, dict) and "error" in result:
+            return result
+        
+        return result
+
 
     def extract_city_name(self, city_str):
         """
