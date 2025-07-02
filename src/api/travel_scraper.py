@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime, timedelta
 import pandas as pd
 from src.config.config import AMADEUS_API_KEY, AMADEUS_API_SECRET
+from src.utils.country_utils import extract_iata
 
 class travel_scraper:
     def __init__(self, api_key=AMADEUS_API_KEY, api_secret=AMADEUS_API_SECRET):
@@ -21,10 +22,6 @@ class travel_scraper:
         response = requests.post(url, headers=headers, data=data)
         response.raise_for_status()
         return response.json()["access_token"]
-
-    def extract_iata(self, airport_str):
-        match = re.search(r'\((\w{3})\)', airport_str)
-        return match.group(1) if match else airport_str
 
     # Using the Amadeus API to fetch travel data information
     def fetch_travel_data(self, origin, destination, travel_date, classInfo, numOfAdults, selected_currency, days_window=7):
@@ -45,8 +42,8 @@ class travel_scraper:
 
         # Extract IATA codes from the origin and destination strings
         # Example: "Istanbul Airport (IST)" -> "IST"
-        origin_code = self.extract_iata(origin)
-        destination_code = self.extract_iata(destination)
+        origin_code = extract_iata(origin)
+        destination_code = extract_iata(destination)
 
         all_flights = []
 
@@ -256,7 +253,7 @@ class travel_scraper:
         Returns a list of hotel dictionaries with ratings (up to 3 rated hotels).
         """
         try:
-            city_iata_code = self.extract_iata(destination)
+            city_iata_code = extract_iata(destination)
             response = requests.get(
                 f"https://test.api.amadeus.com/v1/reference-data/locations/hotels/by-city?cityCode={city_iata_code}",
                 headers={"Authorization": f"Bearer {self.token}"}

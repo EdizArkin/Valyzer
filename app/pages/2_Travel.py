@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import date, timedelta
 import streamlit_toggle as tog
 from src.services.travel_service import TravelService
+from src.utils.country_utils import extract_city_name, get_holidays, extract_iata
 
 
 # Set Streamlit page configuration
@@ -277,7 +278,7 @@ if st.button("Forecast Travel Prices"):
             #--------------------------------------------------------------------------------------------------------------------------------------------
             # Activities and Hotels Section
             st.markdown("-----------------------------------------------------------------------------")
-            selected_city = service.extract_city_name(destination)
+            selected_city = extract_city_name(destination)
             if selected_city:
                 activities = get_cached_activities(selected_city)
                 hotels = get_cached_hotels(destination)
@@ -424,15 +425,31 @@ with st.sidebar:
         render_weather_card(None, "Origin", is_placeholder=True)
     else:
         origin = st.session_state.travel_origin
-        origin_weather = get_cached_weather(service.extract_city_name(origin))
-        render_weather_card(origin_weather, service.extract_city_name(origin))
+        origin_weather = get_cached_weather(extract_city_name(origin))
+        render_weather_card(origin_weather, extract_city_name(origin))
 
     # Destination hava durumu
     if "travel_destination" not in st.session_state or st.session_state.travel_destination == placeholder_text:
         render_weather_card(None, "Destination", is_placeholder=True)
     else:
         destination = st.session_state.travel_destination
-        destination_weather = get_cached_weather(service.extract_city_name(destination))
-        render_weather_card(destination_weather, service.extract_city_name(destination))
+        destination_weather = get_cached_weather(extract_city_name(destination))
+        render_weather_card(destination_weather, extract_city_name(destination))
 
 
+ # ----------------------------------------------------------------------------------------------------------------------------------------
+ # bu kısım kaldı .... -------------->>>>>> HALLOLDU GİBİ
+# Test holidays information
+st.sidebar.markdown("### 📅 Holidays Info")
+if "travel_destination" in st.session_state and st.session_state.travel_destination != placeholder_text:
+    destination = st.session_state.travel_destination
+    city_name = extract_city_name(destination)
+    if city_name:
+        destination_iata_code = extract_iata(destination)
+        holidays = get_holidays(travel_date, destination_iata_code, travel_date.year, return_date if is_round_trip else None)
+        if holidays:
+            st.sidebar.markdown(f"**Holidays in {city_name}:**")
+            for date, name in holidays:
+                st.sidebar.markdown(f"- {date}: {name}")
+        else:
+            st.sidebar.info(f"No holidays found for {city_name}.")

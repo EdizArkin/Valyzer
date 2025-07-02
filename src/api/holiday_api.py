@@ -1,1 +1,0 @@
-# Holiday API coming soon

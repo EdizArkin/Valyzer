@@ -29,6 +29,7 @@ python-dotenv
 
 # Time handling
 holidays
+pycountry
 
 # Jupyter (for notebooks folder)
 notebook

@@ -70,32 +70,4 @@ class TravelService:
         return result
 
 
-    def extract_city_name(self, city_str):
-        """
-        Extracts city name from strings like 'Baruun Urt Airport (UUN)' or 'London, United Kingdom'.
-        Removes airport codes and trims whitespace or generic suffixes like 'Airport'.
-        """
-        # 1. Remove text in parentheses (e.g., "(UUN)")
-        if "(" in city_str:
-            city_str = city_str.split("(")[0].strip()
-            #print(f"Debug: After removing parentheses, city_str = '{city_str}'")  # Debugging
-
-        # 2. Remove "Airport" suffix if present
-        if "Airport" in city_str:
-            city_str = city_str.replace("Airport", "").strip()
-            #print(f"Debug: After removing 'Airport', city_str = '{city_str}'")  # Debugging
-
-        # 3. Remove any trailing text after a hyphen (e.g., "Baruun Urt - Airport")
-        if "-" in city_str:
-            city_str = city_str.split("-")[0].strip()
-            #print(f"Debug: After splitting by hyphen, city_str = '{city_str}'")  # Debugging
-
-
-        # 4. If still has comma (like 'London, United Kingdom'), take the first part
-        if "," in city_str:
-            city_str = city_str.split(",")[0].strip()
-            #print(f"Debug: After splitting by comma, city_str = '{city_str}'")  # Debugging
-
-        return city_str
-
 # Future work: price prediction, filter etc.
