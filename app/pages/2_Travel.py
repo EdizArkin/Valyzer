@@ -203,19 +203,20 @@ if "df_return" not in st.session_state:
 
 
 # Button clicked
-if st.button("Forecast Travel Prices"):
+forecast_clicked = st.button("Forecast Travel Prices")
+if forecast_clicked:
     if origin == placeholder_text or destination == placeholder_text:
         st.warning("⚠️ Please select both origin and destination airports before proceeding.")
         st.session_state["df_departure"] = pd.DataFrame()
         st.session_state["df_return"] = pd.DataFrame()
     else:
         with st.spinner("Loading travel prices... Please wait"):
+            progress_bar = st.progress(0, text="Fetching data...")
             travel_class_api_value = travel_class_map[selected_class_display]
             travel_date_str = travel_date.strftime("%Y-%m-%d")
             return_date_str = return_date.strftime("%Y-%m-%d") if is_round_trip else None
 
             try:
-                # Departure
                 df_departure = get_cached_travel_data(
                     origin=origin,
                     destination=destination,
@@ -224,8 +225,7 @@ if st.button("Forecast Travel Prices"):
                     numOfAdults=num_adults,
                     selected_currency=selected_currency
                 )
-
-                # Return
+                progress_bar.progress(50, text="Fetching return data..." if is_round_trip else "Processing...")
                 df_return = None
                 if is_round_trip:
                     df_return = get_cached_travel_data(
@@ -236,121 +236,130 @@ if st.button("Forecast Travel Prices"):
                         numOfAdults=num_adults,
                         selected_currency=selected_currency
                     )
+                progress_bar.progress(100, text="Done!")
             except Exception as e:
                 st.error(f"⚠️ Error fetching flight data: {e}")
                 df_departure = pd.DataFrame()
                 df_return = pd.DataFrame()
+                progress_bar.empty()
 
-            # Check and store results
             st.session_state["df_departure"] = check_and_warn(df_departure, "Departure - ")
             st.session_state["df_return"] = check_and_warn(df_return, "Return - ") if is_round_trip else pd.DataFrame()
+            progress_bar.empty()
 
-            
-            #!!!!!!!!!!!!! When I press return, the page is still refreshed instead of showing it and the return planes are not shown.
+# --- Grafikler ve tablo için session_state ile roundtrip radio yönetimi ---
+df_departure = st.session_state.get("df_departure", pd.DataFrame())
+df_return = st.session_state.get("df_return", pd.DataFrame())
 
-            # DISPLAY RESULTS
-            df_departure = st.session_state["df_departure"]
-            df_return = st.session_state.get("df_return", pd.DataFrame())
+if not df_departure.empty:
+    if is_round_trip and not df_return.empty:
+        # Sadece grafikler için trip_option'u session_state ile yönet
+        if "trip_option_graph" not in st.session_state:
+            st.session_state["trip_option_graph"] = "Departure"
+        trip_option_graph = st.radio(
+            "Select flight direction",
+            ["Departure", "Return"],
+            horizontal=True,
+            index=0 if st.session_state["trip_option_graph"] == "Departure" else 1,
+            key="trip_option_graph_radio"
+        )
+        if trip_option_graph != st.session_state["trip_option_graph"]:
+            st.session_state["trip_option_graph"] = trip_option_graph
+        current_df = df_departure if st.session_state["trip_option_graph"] == "Departure" else df_return
+    else:
+        current_df = df_departure
+        st.session_state["trip_option_graph"] = "Departure"
 
-            if not df_departure.empty:
-                if is_round_trip and not df_return.empty:
-                    trip_option = st.radio(
-                        "Select flight direction",
-                        ["Departure", "Return"],
-                        horizontal=True
-                    )
-                    current_df = df_departure if trip_option == "Departure" else df_return
+    col1, col2 = st.columns([15, 15], gap="large")
+
+    with col1:
+        st.subheader("📊 Price Table")
+        st.dataframe(current_df)
+
+    with col2:
+        st.subheader("📈 Price Trend")
+        st.line_chart(current_df.set_index("date")["price"])
+        st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
+        st.markdown("**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>", unsafe_allow_html=True)
+
+    #--------------------------------------------------------------------------------------------------------------------------------------------
+    # Activities and Hotels Section
+    st.markdown("-----------------------------------------------------------------------------")
+    # 288. satırda destination'ın oluşup oluşmadığını kontrol et
+    if 'destination' in locals() and destination and destination != placeholder_text:
+        selected_city = extract_city_name(destination)
+        if selected_city:
+            activities = get_cached_activities(selected_city)
+            hotels = get_cached_hotels(destination)
+
+            col1, col2 = st.columns([1, 1], gap="large")
+
+            with col1:
+                st.markdown(f"### 🎯 Things to Do in {selected_city}")
+                if not activities or not isinstance(activities, list):
+                    st.info("❗ No activities found for the selected city.")
                 else:
-                    current_df = df_departure
-
-                col1, col2 = st.columns([15, 15], gap="large")
-
-                with col1:
-                    st.subheader("📊 Price Table")
-                    st.dataframe(current_df)
-
-                with col2:
-                    st.subheader("📈 Price Trend")
-                    st.line_chart(current_df.set_index("date")["price"])
-                    st.markdown("**Note:** The prices are indicative and may vary based on real-time availability and booking conditions.")
-                    st.markdown("**Note:** <span style='color:red'>There may be minor changes in currency exchanges depending on the provider's data!</span>", unsafe_allow_html=True)
-
-            #--------------------------------------------------------------------------------------------------------------------------------------------
-            # Activities and Hotels Section
-            st.markdown("-----------------------------------------------------------------------------")
-            selected_city = extract_city_name(destination)
-            if selected_city:
-                activities = get_cached_activities(selected_city)
-                hotels = get_cached_hotels(destination)
-
-                col1, col2 = st.columns([1, 1], gap="large")
-
-                with col1:
-                    st.markdown(f"### 🎯 Things to Do in {selected_city}")
-                    if not activities or not isinstance(activities, list):
-                        st.info("❗ No activities found for the selected city.")
-                    else:
-                        # Filter activities without description
-                        activities = [a for a in activities if a.get("description")]
-                        if activities:
-                            # Choose 3 random activities
-                            sample_activities = random.sample(activities, min(3, len(activities)))
-                            for activity in sample_activities:
-                                image_urls = activity.get("pictures", [])[:6] if "pictures" in activity else []
-                                st.markdown(f"""
-                                    <div style='
-                                        border: 1px solid #ddd;
-                                        border-radius: 12px;
-                                        padding: 15px;
-                                        margin-bottom: 15px;
-                                        background-color: #fefefe;
-                                        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-                                    '>
-                                        <h4 style='margin-bottom: 8px; color: #333;'>{activity.get("name", "Untitled")}</h4>
-                                        <p style='margin: 0; font-size: 15px; color: #555;'>{activity.get("description")}</p>
-                                        <div style='display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;'>
-                                            {''.join([f"<img src='{url}' style='width: 100px; height: 100px; object-fit: cover; border-radius: 6px;'/>" for url in image_urls])}
-                                        </div>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                        else:
-                            st.info("❗No activities with description found for this city.")
-
-                with col2:
-                    st.markdown(f"### 🏨 Top Rated Hotels in {selected_city}")
-                    if not hotels or not isinstance(hotels, list):
-                        st.info("❗ No hotel data found.")
-                    else:
-                        hotels = sorted(hotels, key=lambda h: h.get("overallRating", 0) or 0, reverse=True)[:10]
-
-                        for hotel in hotels:
-                            rating = hotel.get("overallRating")
-                            if rating is not None:
-                                stars = math.ceil((rating / 100) * 5)
-                                yellow_star = "⭐"
-                                white_star = "☆"
-                                star_display = yellow_star * stars + white_star * (5 - stars)
-                                rating_text = f"{rating}/100"
-                                star_line = f"<p style='font-size: 18px;'>{star_display}</p>"
-                            else:
-                                rating_text = "Rating info not available"
-                                star_line = ""
-
+                    # Filter activities without description
+                    activities = [a for a in activities if a.get("description")]
+                    if activities:
+                        # Choose 3 random activities
+                        sample_activities = random.sample(activities, min(3, len(activities)))
+                        for activity in sample_activities:
+                            image_urls = activity.get("pictures", [])[:6] if "pictures" in activity else []
                             st.markdown(f"""
                                 <div style='
                                     border: 1px solid #ddd;
                                     border-radius: 12px;
                                     padding: 15px;
                                     margin-bottom: 15px;
-                                    background-color: #fdfdfd;
+                                    background-color: #fefefe;
                                     box-shadow: 0 2px 6px rgba(0,0,0,0.05);
                                 '>
-                                    <h4 style='margin-bottom: 6px; color: #333;'>{hotel.get("name", "Unnamed Hotel")}</h4>
-                                    <p style='margin: 0 0 4px 0; font-size: 15px; color: #555;'>Overall Rating: {rating_text}</p>
-                                    <p style='margin: 0 0 4px 0; font-size: 14px; color: #777;'>Reviews: {hotel.get("numberOfReviews", "N/A")} | Ratings: {hotel.get("numberOfRatings", "N/A")}</p>
-                                    {star_line}
+                                    <h4 style='margin-bottom: 8px; color: #333;'>{activity.get("name", "Untitled")}</h4>
+                                    <p style='margin: 0; font-size: 15px; color: #555;'>{activity.get("description")}</p>
+                                    <div style='display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;'>
+                                        {''.join([f"<img src='{url}' style='width: 100px; height: 100px; object-fit: cover; border-radius: 6px;'/>" for url in image_urls])}
+                                    </div>
                                 </div>
                             """, unsafe_allow_html=True)
+                    else:
+                        st.info("❗No activities with description found for this city.")
+
+            with col2:
+                st.markdown(f"### 🏨 Top Rated Hotels in {selected_city}")
+                if not hotels or not isinstance(hotels, list):
+                    st.info("❗ No hotel data found.")
+                else:
+                    hotels = sorted(hotels, key=lambda h: h.get("overallRating", 0) or 0, reverse=True)[:10]
+
+                    for hotel in hotels:
+                        rating = hotel.get("overallRating")
+                        if rating is not None:
+                            stars = math.ceil((rating / 100) * 5)
+                            yellow_star = "⭐"
+                            white_star = "☆"
+                            star_display = yellow_star * stars + white_star * (5 - stars)
+                            rating_text = f"{rating}/100"
+                            star_line = f"<p style='font-size: 18px;'>{star_display}</p>"
+                        else:
+                            rating_text = "Rating info not available"
+                            star_line = ""
+
+                        st.markdown(f"""
+                            <div style='
+                                border: 1px solid #ddd;
+                                border-radius: 12px;
+                                padding: 15px;
+                                margin-bottom: 15px;
+                                background-color: #fdfdfd;
+                                box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+                            '>
+                                <h4 style='margin-bottom: 6px; color: #333;'>{hotel.get("name", "Unnamed Hotel")}</h4>
+                                <p style='margin: 0 0 4px 0; font-size: 15px; color: #555;'>Overall Rating: {rating_text}</p>
+                                <p style='margin: 0 0 4px 0; font-size: 14px; color: #777;'>Reviews: {hotel.get("numberOfReviews", "N/A")} | Ratings: {hotel.get("numberOfRatings", "N/A")}</p>
+                                {star_line}
+                            </div>
+                        """, unsafe_allow_html=True)
 
 
 
