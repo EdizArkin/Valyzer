@@ -7,7 +7,7 @@ class DataManager:
         self.airports = []
 
     def load_airports(self, filename="airports.csv"):
-        path = f"{self.data_folder}/{filename}"
+        path = f"{self.data_folder}{filename}"
         with open(path, encoding='utf-8') as f:
             reader = csv.reader(f)
             for row in reader:

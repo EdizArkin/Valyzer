@@ -5,6 +5,8 @@ scikit-learn
 xgboost
 tensorflow
 prophet
+cmdstanpy
+
 
 # Visualization
 matplotlib
@@ -13,6 +15,7 @@ streamlit
 streamlit-autocomplete
 streamlit-toggle
 streamlit-toggle-switch
+plotly
 
 
 # Web scraping & API

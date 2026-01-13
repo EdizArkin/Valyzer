@@ -217,7 +217,6 @@ data/processed/
 
 # Eğitilmiş modeller
 *.pkl
-models/
 checkpoints/
 
 # IDE ayarları

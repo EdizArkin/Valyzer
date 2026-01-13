@@ -10,6 +10,7 @@ from datetime import date, timedelta
 import streamlit_toggle as tog
 from src.services.travel_service import TravelService
 from src.utils.country_utils import extract_city_name, get_holidays, extract_iata
+from models.travel_forecaster import TravelForecaster
 
 
 # Set Streamlit page configuration
@@ -215,6 +216,8 @@ if forecast_clicked:
             travel_class_api_value = travel_class_map[selected_class_display]
             travel_date_str = travel_date.strftime("%Y-%m-%d")
             return_date_str = return_date.strftime("%Y-%m-%d") if is_round_trip else None
+            st.session_state["travel_date_str"] = travel_date_str
+            st.session_state["return_date_str"] = return_date_str
 
             try:
                 df_departure = get_cached_travel_data(
@@ -237,6 +240,24 @@ if forecast_clicked:
                         selected_currency=selected_currency
                     )
                 progress_bar.progress(100, text="Done!")
+                # --- TEST PRINTS ---
+                print("DEPARTURE FLIGHT DATA HEAD:")
+                print(df_departure.head() if isinstance(df_departure, pd.DataFrame) else df_departure)
+                print("RETURN FLIGHT DATA HEAD:")
+                print(df_return.head() if isinstance(df_return, pd.DataFrame) else df_return)
+                print("TRAVEL DATE HEAD:")
+                print(travel_date)
+                print("RETURN DATE HEAD:")
+                print(return_date)
+                print("ORIGIN WEATHER HEAD:")
+                print(service.get_weather(extract_city_name(origin)))
+                print("DESTINATION WEATHER HEAD:")
+                print(service.get_weather(extract_city_name(destination)))
+                # Tatil günlerinin head'i
+                destination_iata_code = extract_iata(destination)
+                holidays = get_holidays(travel_date, destination_iata_code, travel_date.year, return_date if is_round_trip else None)
+                print("HOLIDAYS HEAD:")
+                print(holidays[:5] if isinstance(holidays, list) else holidays)
             except Exception as e:
                 st.error(f"⚠️ Error fetching flight data: {e}")
                 df_departure = pd.DataFrame()
@@ -269,6 +290,88 @@ if not df_departure.empty:
     else:
         current_df = df_departure
         st.session_state["trip_option_graph"] = "Departure"
+
+
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!! BURAYA TEKRAR BAK ----------------------------------!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # 💡 Prophet modeli eğit & öneriyi üret
+    try:
+        with st.spinner("🧠 Training ML model and analyzing prices..."):
+            model = TravelForecaster()
+
+            # 🔵 Get dates from Session
+            travel_date_str = st.session_state.get("travel_date_str")
+            return_date_str = st.session_state.get("return_date_str")
+            forecast_target_date = travel_date_str if st.session_state["trip_option_graph"] == "Departure" else return_date_str
+            current_df = df_departure if st.session_state["trip_option_graph"] == "Departure" else df_return
+
+            df_clean = model.preprocess(current_df, forecast_target_date)
+            model.train(df_clean)
+            forecast_df = model.forecast(forecast_target_date)
+
+            days_before, best_price = model.recommend_buy_day()
+
+            if days_before and best_price:
+
+                st.session_state["forecast_result"] = {
+                    "days_before": days_before,
+                    "best_price": best_price,
+                    "rmse": model.get_model_rmse(),
+                    "forecast_target_date": forecast_target_date,
+                }
+
+                # 🔵 Session'dan Smart Forecast sonucu varsa göster
+                if "forecast_result" in st.session_state:
+                    forecast_result = st.session_state["forecast_result"]
+                    days_before = forecast_result["days_before"]
+                    best_price = forecast_result["best_price"]
+                    rmse = forecast_result["rmse"]
+                    target_date = forecast_result["forecast_target_date"]
+
+                    # 🗓️ Tahmini satın alma tarihi
+                    from datetime import datetime, timedelta
+                    today = datetime.today().date()
+                    purchase_date = datetime.strptime(target_date, "%Y-%m-%d").date() - timedelta(days=days_before)
+
+                    # 🧠 Öneri mesajı
+                    if purchase_date <= today:
+                        suggestion = "You should buy your ticket now to get the best price."
+                    else:
+                        suggestion = f"Buying it on <b>{purchase_date.strftime('%Y-%m-%d')}</b> will save you the most."
+
+                    st.markdown(f"""
+                    <div style='
+                        background-color: #e8f4fd;
+                        border-left: 6px solid #3498db;
+                        padding: 16px;
+                        border-radius: 8px;
+                        margin-bottom: 10px;
+                        font-size: 16px;
+                    '>
+                        <b>📢 Smart Forecast:</b><br>
+                        For the best price, buy your ticket <b>{days_before} days before</b> the flight.<br>
+                        Expected price: <b>{round(best_price, 2)} {selected_currency}</b><br>
+                        {suggestion}
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    if rmse:
+                        st.markdown(f"""
+                        <div style='
+                            background-color: #f0f8ff;
+                            border-left: 6px solid #6cace4;
+                            padding: 10px;
+                            border-radius: 6px;
+                            font-size: 15px;
+                            margin-top: 5px;
+                            margin-bottom: 15px;
+                        '>
+                            🔍 <b>Model Accuracy:</b> RMSE = <b>{round(rmse, 2)}</b>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+
+    except Exception as e:
+        st.warning(f"❗ ML model could not be trained: {e}")
 
     col1, col2 = st.columns([15, 15], gap="large")
 
@@ -446,8 +549,8 @@ with st.sidebar:
         render_weather_card(destination_weather, extract_city_name(destination))
 
 
- # ----------------------------------------------------------------------------------------------------------------------------------------
- # bu kısım kaldı .... -------------->>>>>> HALLOLDU GİBİ
+# ----------------------------------------------------------------------------------------------------------------------------------------
+# bu kısım kaldı .... -------------->>>>>> HALLOLDU GİBİ
 # Test holidays information
 st.sidebar.markdown("### 📅 Holidays Info")
 if "travel_destination" in st.session_state and st.session_state.travel_destination != placeholder_text:

@@ -18,13 +18,17 @@ GOOGLE_TRENDS_REGION = os.getenv("GOOGLE_TRENDS_REGION", "TR")
 CALENDARIFIC_API_KEY = os.getenv("CALENDARIFIC_API_KEY")  # (optional, if using holiday API)
 
 # --- PATHS ---
-RAW_DATA_PATH = "data/RawDatasets/"
-PROCESSED_DATA_PATH = "data/ProcessedDatasets/"
-MODEL_PATH = "models/" # where trained models are saved
-RESULTS_PATH = "results/" # where results are saved
-NOTEBOOK_PATH = "notebooks/"
-LOG_PATH = "logs/"
-SRC_PATH = "src/"  
+# Get the project root directory (parent of src/)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+RAW_DATA_PATH = os.path.join(PROJECT_ROOT, "data", "RawDatasets") + os.sep
+PROCESSED_DATA_PATH = os.path.join(PROJECT_ROOT, "data", "ProcessedDatasets") + os.sep
+MODEL_PATH = os.path.join(PROJECT_ROOT, "models") + os.sep
+RESULTS_PATH = os.path.join(PROJECT_ROOT, "results") + os.sep
+NOTEBOOK_PATH = os.path.join(PROJECT_ROOT, "notebooks") + os.sep
+LOG_PATH = os.path.join(PROJECT_ROOT, "logs") + os.sep
+SRC_PATH = os.path.join(PROJECT_ROOT, "src") + os.sep  
+IMG_PATH = os.path.join(PROJECT_ROOT, "images") + os.sep
 
 # --- MODEL PARAMETERS ---
 FORECAST_DAYS = 30
